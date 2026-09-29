@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="active_stroke">2dp</dimen>
+    <dimen name="dialog_padding">24dp</dimen>
+    <dimen name="reader_scroll_offset">96dp</dimen>
+    <dimen name="touch_target">48dp</dimen>
+</resources>

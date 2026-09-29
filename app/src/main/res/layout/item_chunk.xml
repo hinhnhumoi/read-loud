@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginVertical="4dp"
+    android:background="@drawable/bg_chunk"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground">
+
+    <TextView
+        android:id="@+id/text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:lineSpacingMultiplier="1.35"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp"
+        android:textAppearance="?attr/textAppearanceBodyLarge"
+        android:textIsSelectable="true"
+        android:textColor="?attr/colorOnSurface"
+        tools:text="Ảnh Đao Khách thoắt cái hợp thể, mọi người ập lên điên cuồng tấn công." />
+</FrameLayout>

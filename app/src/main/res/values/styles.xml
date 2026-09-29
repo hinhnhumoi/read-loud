@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Icon above a short label, so three fit on one row even with large system fonts. -->
+    <style name="Widget.ReadLoud.StackedButton" parent="Widget.Material3.Button.TextButton.Icon">
+        <item name="iconGravity">top</item>
+        <item name="iconPadding">4dp</item>
+        <item name="android:minHeight">64dp</item>
+        <item name="android:paddingStart">4dp</item>
+        <item name="android:paddingEnd">4dp</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:textAppearance">?attr/textAppearanceLabelMedium</item>
+    </style>
+</resources>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_home"
+            android:checked="true"
+            android:icon="@drawable/ic_notification"
+            android:title="@string/nav_home" />
+        <item
+            android:id="@+id/nav_library"
+            android:icon="@drawable/ic_library"
+            android:title="@string/library_title" />
+    </group>
+    <group android:id="@+id/nav_group_open">
+        <item
+            android:id="@+id/nav_open_file"
+            android:icon="@drawable/ic_book"
+            android:title="@string/action_open_file" />
+    </group>
+    <group android:id="@+id/nav_group_settings">
+        <item
+            android:id="@+id/nav_voice"
+            android:icon="@drawable/ic_voice"
+            android:title="@string/voice_title" />
+        <item
+            android:id="@+id/nav_rules"
+            android:icon="@drawable/ic_tune"
+            android:title="@string/rules_title" />
+        <item
+            android:id="@+id/nav_battery"
+            android:icon="@drawable/ic_bolt"
+            android:title="@string/action_battery" />
+        <item
+            android:id="@+id/nav_event_log"
+            android:icon="@drawable/ic_history"
+            android:title="@string/event_log_title" />
+    </group>
+</menu>
