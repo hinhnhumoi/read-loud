@@ -1,16 +1,64 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.ReadLoud" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/md_primary</item>
-        <item name="colorOnPrimary">@color/md_on_primary</item>
-        <item name="colorPrimaryContainer">@color/md_primary_container</item>
-        <item name="colorOnPrimaryContainer">@color/md_on_primary_container</item>
-        <item name="colorSecondary">@color/md_secondary</item>
-        <item name="colorOnSecondary">@color/md_on_secondary</item>
-        <item name="colorSecondaryContainer">@color/md_secondary_container</item>
-        <item name="colorOnSecondaryContainer">@color/md_on_secondary_container</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">true</item>
+    <style name="Theme.ReadLoud" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/rl_accent</item>
+        <item name="colorOnPrimary">@color/rl_on_accent</item>
+        <item name="colorPrimaryContainer">@color/rl_accent_tint</item>
+        <item name="colorOnPrimaryContainer">@color/rl_text</item>
+        <item name="colorSecondary">@color/rl_muted</item>
+        <item name="colorOnSecondary">@color/rl_bg</item>
+        <item name="colorSecondaryContainer">@color/rl_surface_2</item>
+        <item name="colorOnSecondaryContainer">@color/rl_text</item>
+        <item name="colorTertiary">@color/rl_offline</item>
+        <item name="colorOnTertiary">@color/rl_bg</item>
+        <item name="colorError">@color/rl_warn</item>
+        <item name="colorOnError">@color/rl_on_accent</item>
+        <item name="colorSurface">@color/rl_bg</item>
+        <item name="colorOnSurface">@color/rl_text</item>
+        <item name="colorOnSurfaceVariant">@color/rl_muted</item>
+        <item name="colorSurfaceVariant">@color/rl_surface_2</item>
+        <item name="colorSurfaceContainerLowest">@color/rl_bg</item>
+        <item name="colorSurfaceContainerLow">@color/rl_nav</item>
+        <item name="colorSurfaceContainer">@color/rl_surface</item>
+        <item name="colorSurfaceContainerHigh">@color/rl_surface_2</item>
+        <item name="colorSurfaceContainerHighest">@color/rl_surface_3</item>
+        <item name="colorOutline">@color/rl_track</item>
+        <item name="colorOutlineVariant">@color/rl_line</item>
+        <item name="android:colorBackground">@color/rl_bg</item>
+        <item name="android:windowBackground">@color/rl_bg</item>
+        <item name="android:statusBarColor">@color/rl_bg</item>
+        <item name="android:navigationBarColor">@color/rl_nav</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+
+        <!-- Default type through the widget styles, so a textAppearance on a view still wins. -->
+        <item name="android:textViewStyle">@style/Widget.RL.TextView</item>
+        <item name="editTextStyle">@style/Widget.RL.EditText</item>
+        <item name="radioButtonStyle">@style/Widget.RL.RadioButton</item>
+        <item name="textAppearanceDisplaySmall">@style/TextAppearance.RL.Display</item>
+        <item name="textAppearanceHeadlineLarge">@style/TextAppearance.RL.Display</item>
+        <item name="textAppearanceHeadlineMedium">@style/TextAppearance.RL.Headline</item>
+        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.RL.Headline</item>
+        <item name="textAppearanceTitleLarge">@style/TextAppearance.RL.ToolbarTitle</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.RL.Title</item>
+        <item name="textAppearanceTitleSmall">@style/TextAppearance.RL.TitleSmall</item>
+        <item name="textAppearanceBodyLarge">@style/TextAppearance.RL.BodyLarge</item>
+        <item name="textAppearanceBodyMedium">@style/TextAppearance.RL.Body</item>
+        <item name="textAppearanceBodySmall">@style/TextAppearance.RL.Meta</item>
+        <item name="textAppearanceLabelLarge">@style/TextAppearance.RL.Button</item>
+        <item name="textAppearanceLabelMedium">@style/TextAppearance.RL.Label</item>
+        <item name="textAppearanceLabelSmall">@style/TextAppearance.RL.Small</item>
+
+        <item name="materialCardViewStyle">@style/Widget.RL.Card</item>
+        <item name="toolbarStyle">@style/Widget.RL.Toolbar</item>
+        <item name="sliderStyle">@style/Widget.RL.Slider</item>
+        <item name="linearProgressIndicatorStyle">@style/Widget.RL.Progress</item>
+        <item name="chipStyle">@style/Widget.RL.Chip</item>
+        <item name="materialSwitchStyle">@style/Widget.RL.Switch</item>
+        <item name="textInputStyle">@style/Widget.RL.TextInput</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.RL.BottomSheetDialog</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.RL.Dialog</item>
+        <item name="popupMenuStyle">@style/Widget.RL.PopupMenu</item>
+        <item name="actionModeBackground">@color/rl_surface_2</item>
     </style>
 </resources>

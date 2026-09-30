@@ -3,21 +3,17 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginVertical="4dp"
-    android:background="@drawable/bg_chunk"
-    android:clickable="true"
-    android:focusable="true"
-    android:foreground="?attr/selectableItemBackground">
+    android:layout_marginVertical="6dp"
+    android:background="@drawable/bg_chunk">
 
     <TextView
         android:id="@+id/text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:lineSpacingMultiplier="1.35"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="12dp"
-        android:textAppearance="?attr/textAppearanceBodyLarge"
+        android:lineSpacingMultiplier="1.4"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="8dp"
+        android:textAppearance="@style/TextAppearance.RL.Reading"
         android:textIsSelectable="true"
-        android:textColor="?attr/colorOnSurface"
-        tools:text="Ảnh Đao Khách thoắt cái hợp thể, mọi người ập lên điên cuồng tấn công." />
+        tools:text="Diệp Tu khẽ cười, ngón tay lướt nhanh trên bàn phím, Quân Mạc Tiếu lập tức lao lên phía trước." />
 </FrameLayout>

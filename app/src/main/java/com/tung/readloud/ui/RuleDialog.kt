@@ -16,7 +16,13 @@ import kotlinx.coroutines.launch
 /** Add or edit one pronunciation rule; [sample] is the text the rule is previewed against. */
 object RuleDialog {
 
-    fun show(activity: AppCompatActivity, existing: ReplaceRule? = null, prefill: String? = null, sample: String? = null) {
+    fun show(
+        activity: AppCompatActivity,
+        existing: ReplaceRule? = null,
+        prefill: String? = null,
+        sample: String? = null,
+        novelId: Long? = null,
+    ) {
         val binding = DialogRuleBinding.inflate(LayoutInflater.from(activity))
         val repo = RuleRepository(activity)
         binding.pattern.setText(existing?.pattern ?: prefill?.trim().orEmpty())
@@ -30,6 +36,7 @@ object RuleDialog {
             isRegex = binding.isRegex.isChecked,
             enabled = existing?.enabled ?: true,
             createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+            novelId = existing?.novelId ?: novelId,
         )
 
         fun refreshPreview() {

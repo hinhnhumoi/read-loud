@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/playerRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/rl_bg"
+    android:clickable="true"
+    android:focusable="true"
+    android:orientation="vertical">
+
+    <!-- Header: collapse · what is playing · table of contents -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="8dp"
+        android:paddingTop="8dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCollapse"
+            style="@style/Widget.RL.IconButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:contentDescription="@string/player_collapse"
+            app:icon="@drawable/ic_chevron_down"
+            app:iconSize="26dp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/playerStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="@style/TextAppearance.RL.Section"
+                android:textSize="12sp"
+                tools:text="Đang đọc" />
+
+            <TextView
+                android:id="@+id/playerNovel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textAppearance="@style/TextAppearance.RL.Title"
+                tools:text="Toàn Chức Cao Thủ" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPlayerToc"
+            style="@style/Widget.RL.IconButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:contentDescription="@string/toc_title"
+            app:icon="@drawable/ic_list"
+            app:iconSize="24dp" />
+    </LinearLayout>
+
+    <include
+        android:id="@+id/playerBanner"
+        layout="@layout/view_status_banner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginTop="12dp" />
+
+    <!-- The sentence being read, between the one before and the one after. Tap for the full text. -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/sentenceFrame"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginTop="16dp"
+        android:layout_weight="1"
+        android:clickable="true"
+        android:focusable="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/frameChapter"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textAppearance="@style/TextAppearance.RL.Label"
+                    android:textSize="14sp"
+                    tools:text="Chương 192" />
+
+                <TextView
+                    android:id="@+id/frameChunk"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:textAppearance="@style/TextAppearance.RL.Label"
+                    android:textSize="14sp"
+                    tools:text="Đoạn 14/58" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:gravity="center_vertical"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/sentencePrev"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="start"
+                    android:lineSpacingMultiplier="1.3"
+                    android:maxLines="2"
+                    android:textAppearance="@style/TextAppearance.RL.SentenceSide"
+                    tools:text="Trên màn hình, nhân vật của đối thủ vẫn đang đứng yên chờ hồi kỹ năng." />
+
+                <TextView
+                    android:id="@+id/sentenceNow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:ellipsize="end"
+                    android:lineSpacingMultiplier="1.25"
+                    android:maxLines="7"
+                    android:textAppearance="@style/TextAppearance.RL.Sentence"
+                    tools:text="Diệp Tu khẽ cười, ngón tay lướt nhanh trên bàn phím, Quân Mạc Tiếu lập tức lao lên phía trước." />
+
+                <TextView
+                    android:id="@+id/sentenceNext"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:ellipsize="end"
+                    android:lineSpacingMultiplier="1.3"
+                    android:maxLines="2"
+                    android:textAppearance="@style/TextAppearance.RL.SentenceSide"
+                    tools:text="Khán giả trong quán net đồng loạt đứng bật dậy…" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/frameHint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:drawablePadding="10dp"
+                android:gravity="center_vertical"
+                android:text="@string/player_open_text"
+                android:textAppearance="@style/TextAppearance.RL.TitleSmall"
+                android:textColor="@color/rl_accent"
+                app:drawableStartCompat="@drawable/ic_book_open"
+                app:drawableTint="@color/rl_accent" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Seek by chunk -->
+    <com.google.android.material.slider.Slider
+        android:id="@+id/chunkSlider"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="10dp"
+        android:layout_marginTop="12dp"
+        android:contentDescription="@string/player_chunk_label"
+        android:stepSize="1"
+        android:valueFrom="0"
+        android:valueTo="1"
+        />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="24dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/seekLeft"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textAppearance="@style/TextAppearance.RL.Label"
+            tools:text="đoạn 14" />
+
+        <TextView
+            android:id="@+id/seekRight"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.RL.Label"
+            tools:text="còn ~14 phút" />
+    </LinearLayout>
+
+    <!-- Transport: chapter · chunk · play · chunk · chapter -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPrevChapter"
+            style="@style/Widget.RL.IconButton.Muted"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:contentDescription="@string/action_prev_chapter"
+            app:icon="@drawable/ic_skip_previous"
+            app:iconSize="26dp" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPrevChunk"
+            style="@style/Widget.RL.IconButton"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:contentDescription="@string/action_prev_chunk"
+            app:icon="@drawable/ic_replay"
+            app:iconSize="30dp" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <FrameLayout
+            android:layout_width="84dp"
+            android:layout_height="84dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnToggle"
+                style="@style/Widget.RL.IconButton.Filled"
+                android:layout_width="84dp"
+                android:layout_height="84dp"
+                android:contentDescription="@string/action_play"
+                app:cornerRadius="42dp"
+                app:icon="@drawable/ic_play"
+                app:iconSize="36dp" />
+
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/playerLoading"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:indeterminate="true"
+                android:visibility="gone"
+                app:indicatorColor="@color/rl_on_accent"
+                app:indicatorSize="40dp"
+                app:trackColor="@android:color/transparent"
+                app:trackThickness="3dp" />
+        </FrameLayout>
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnNextChunk"
+            style="@style/Widget.RL.IconButton"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:contentDescription="@string/action_next_chunk"
+            app:icon="@drawable/ic_forward"
+            app:iconSize="30dp" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnNextChapter"
+            style="@style/Widget.RL.IconButton.Muted"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:contentDescription="@string/action_next"
+            app:icon="@drawable/ic_skip_next"
+            app:iconSize="26dp" />
+    </LinearLayout>
+
+    <!-- Quick actions -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/quickSpeed"
+            style="@style/RL.QuickTile"
+            android:layout_marginEnd="8dp">
+
+            <TextView
+                android:id="@+id/quickSpeedValue"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:gravity="center"
+                android:textAppearance="@style/TextAppearance.RL.Title"
+                android:textSize="18sp"
+                tools:text="1.3×" />
+
+            <TextView
+                style="@style/RL.QuickTile.Label"
+                android:text="@string/label_rate" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/quickSleep"
+            style="@style/RL.QuickTile"
+            android:layout_marginEnd="8dp">
+
+            <ImageView
+                android:id="@+id/quickSleepIcon"
+                style="@style/RL.QuickTile.Icon"
+                android:src="@drawable/ic_moon" />
+
+            <TextView
+                android:id="@+id/quickSleepLabel"
+                style="@style/RL.QuickTile.Label"
+                android:text="@string/action_sleep" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/quickVoice"
+            style="@style/RL.QuickTile"
+            android:layout_marginEnd="8dp">
+
+            <ImageView
+                style="@style/RL.QuickTile.Icon"
+                android:src="@drawable/ic_waveform" />
+
+            <TextView
+                android:id="@+id/quickVoiceLabel"
+                style="@style/RL.QuickTile.Label"
+                tools:text="Hoài My" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/quickDownload"
+            style="@style/RL.QuickTile">
+
+            <ImageView
+                android:id="@+id/quickDownloadIcon"
+                style="@style/RL.QuickTile.Icon"
+                android:src="@drawable/ic_download" />
+
+            <TextView
+                android:id="@+id/quickDownloadLabel"
+                style="@style/RL.QuickTile.Label"
+                android:text="@string/action_download" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

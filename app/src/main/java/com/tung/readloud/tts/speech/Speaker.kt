@@ -12,6 +12,9 @@ interface Speaker {
 
         /** Nothing is playing because the voice is still waiting for audio; false once sound resumes. */
         fun onStall(waiting: Boolean) {}
+
+        /** Roughly how far into the utterance the voice is now, from 0 to 1. */
+        fun onProgress(utteranceId: String, fraction: Float) {}
     }
 
     /** How many chunks beyond the current one should be queued ahead of time. */
@@ -31,6 +34,9 @@ interface Speaker {
     fun pause(): Boolean
 
     fun resume(): Boolean
+
+    /** Loudness from 0 to 1, for fading out at the end of a sleep timer. */
+    fun setVolume(volume: Float)
 
     fun release()
 }

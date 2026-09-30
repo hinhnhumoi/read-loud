@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /** "Read [pattern] as [replacement]". Plain patterns match whole words, ignoring case. */
 @Entity(tableName = "replace_rules")
@@ -17,6 +18,8 @@ data class ReplaceRule(
     val isRegex: Boolean = false,
     val enabled: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
+    /** The novel this rule is for; null applies it to every novel. */
+    val novelId: Long? = null,
 )
 
 @Dao
@@ -29,9 +32,15 @@ interface ReplaceRuleDao {
 
     @Query("DELETE FROM replace_rules WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("DELETE FROM replace_rules WHERE novelId = :novelId")
+    suspend fun clearFor(novelId: Long)
 }
 
 class CompiledRule(val regex: Regex, val replacement: String)
+
+/** The rules for everything plus the ones for [novelId]. */
+fun List<ReplaceRule>.applyingTo(novelId: Long?): List<ReplaceRule> = filter { it.novelId == null || it.novelId == novelId }
 
 object ReplaceRules {
     private const val WORD_BEFORE = "(?<![\\p{L}\\p{N}])"
@@ -61,7 +70,11 @@ object ReplaceRules {
 class RuleRepository(context: android.content.Context) {
     private val dao = AppDatabase.get(context).rules()
 
+    /** Every rule, for every novel; the reader picks the ones that apply. */
     val rules: Flow<List<ReplaceRule>> = dao.observeAll()
+
+    /** Rules that apply everywhere, or only to [novelId] when it is given. */
+    fun rulesFor(novelId: Long?): Flow<List<ReplaceRule>> = rules.map { all -> all.filter { it.novelId == novelId } }
 
     suspend fun save(rule: ReplaceRule) = dao.upsert(rule)
 

@@ -2,6 +2,7 @@ package com.tung.readloud.tts.speech
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
@@ -25,6 +26,10 @@ class SystemSpeaker(
     private val ready = CompletableDeferred<Speaker.PrepareResult>()
     private lateinit var tts: TextToSpeech
     private var ok = false
+    private var volume = 1f
+
+    /** Text length per queued utterance, to turn the engine's character ranges into a fraction. */
+    private val lengths = java.util.concurrent.ConcurrentHashMap<String, Int>()
 
     init {
         val onInit = TextToSpeech.OnInitListener { status -> main.post { ready.complete(configure(status)) } }
@@ -46,9 +51,17 @@ class SystemSpeaker(
         }
         tts.setAudioAttributes(attributes)
         tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String) = Unit
+            override fun onStart(utteranceId: String) {
+                main.post { listener.onProgress(utteranceId, 0f) }
+            }
+
+            override fun onRangeStart(utteranceId: String, start: Int, end: Int, frame: Int) {
+                val length = lengths[utteranceId] ?: return
+                main.post { listener.onProgress(utteranceId, start.toFloat() / length.coerceAtLeast(1)) }
+            }
 
             override fun onDone(utteranceId: String) {
+                lengths.remove(utteranceId)
                 main.post { listener.onDone(utteranceId) }
             }
 
@@ -67,10 +80,14 @@ class SystemSpeaker(
         withTimeoutOrNull(INIT_TIMEOUT_MS) { ready.await() } ?: Speaker.PrepareResult.FAILED
 
     override fun enqueue(utteranceId: String, text: String) {
-        if (ok) tts.speak(text, TextToSpeech.QUEUE_ADD, null, utteranceId)
+        if (!ok) return
+        lengths[utteranceId] = text.length
+        val params = if (volume < 1f) Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume) } else null
+        tts.speak(text, TextToSpeech.QUEUE_ADD, params, utteranceId)
     }
 
     override fun stop() {
+        lengths.clear()
         if (ok) tts.stop()
     }
 
@@ -85,6 +102,11 @@ class SystemSpeaker(
     override fun pause(): Boolean = false
 
     override fun resume(): Boolean = false
+
+    /** Applies from the next chunk handed to the engine; one already queued keeps the volume it was given. */
+    override fun setVolume(volume: Float) {
+        this.volume = volume
+    }
 
     override fun release() {
         runCatching { if (ok) tts.stop() }

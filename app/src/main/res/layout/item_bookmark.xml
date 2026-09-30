@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="10dp"
+    android:background="@drawable/bg_search"
+    android:orientation="horizontal">
+
+    <LinearLayout
+        android:id="@+id/body"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="?attr/selectableItemBackground"
+        android:orientation="vertical"
+        android:paddingVertical="14dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="4dp">
+
+        <TextView
+            android:id="@+id/where"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textAppearance="@style/TextAppearance.RL.Small"
+            android:textColor="@color/rl_accent"
+            android:textStyle="bold"
+            tools:text="Chương 187 · đoạn 22" />
+
+        <TextView
+            android:id="@+id/quote"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:ellipsize="end"
+            android:maxLines="4"
+            android:textAppearance="@style/TextAppearance.RL.Reading"
+            android:textSize="15sp"
+            tools:text="“Vinh quang không thuộc về một người…”" />
+
+        <TextView
+            android:id="@+id/note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textAppearance="@style/TextAppearance.RL.Meta"
+            android:textColor="@color/rl_faint"
+            android:visibility="gone"
+            tools:text="Ghi chú: đoạn hay, nghe lại"
+            tools:visibility="visible" />
+    </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnMenu"
+        style="@style/Widget.RL.IconButton.Muted"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="4dp"
+        android:contentDescription="@string/detail_more"
+        app:icon="@drawable/ic_more_vert"
+        app:iconSize="20dp" />
+</LinearLayout>

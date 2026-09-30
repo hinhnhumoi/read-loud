@@ -36,8 +36,16 @@ class BookStore(context: Context) {
             FORMAT_PDF -> parsePdf(resolver, uri, baseName)
             else -> resolver.openInputStream(uri)?.use { TxtParser.parse(it.readBytes(), baseName) }
         } ?: throw IOException("Không mở được file")
+        save(Hashing.sha1("$name|$size").take(16), book, format)
+    }
 
-        val id = Hashing.sha1("$name|$size").take(16)
+    /** Stores pasted text as a book of its own; pasting the same text again gives the same book. */
+    suspend fun importText(title: String, text: String): Imported = withContext(Dispatchers.IO) {
+        val book = TxtParser.parse(text.toByteArray(Charsets.UTF_8), title)
+        save(Hashing.sha1("text|$text").take(16), book, FORMAT_TXT)
+    }
+
+    private fun save(id: String, book: ParsedBook, format: String): Imported {
         val dir = File(root, id)
         dir.deleteRecursively()
         dir.mkdirs()
@@ -54,7 +62,7 @@ class BookStore(context: Context) {
                 .put("format", format)
                 .toString(),
         )
-        Imported(id, book.title, book.chapters.size)
+        return Imported(id, book.title, book.chapters.size)
     }
 
     /** PdfBox needs random access, so the picked file is copied to the cache first. */

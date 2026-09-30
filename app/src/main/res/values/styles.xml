@@ -1,13 +1,498 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Icon above a short label, so three fit on one row even with large system fonts. -->
-    <style name="Widget.ReadLoud.StackedButton" parent="Widget.Material3.Button.TextButton.Icon">
+    <!-- Type: Literata for titles and reading, Be Vietnam Pro for everything else. -->
+    <style name="TextAppearance.RL.Display" parent="TextAppearance.Material3.HeadlineLarge">
+        <item name="fontFamily">@font/literata_semibold</item>
+        <item name="android:fontFamily">@font/literata_semibold</item>
+        <item name="android:textSize">30sp</item>
+        <item name="android:textColor">@color/rl_text</item>
+    </style>
+
+    <style name="TextAppearance.RL.Headline" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="fontFamily">@font/literata_semibold</item>
+        <item name="android:fontFamily">@font/literata_semibold</item>
+        <item name="android:textSize">24sp</item>
+        <item name="android:textColor">@color/rl_text</item>
+    </style>
+
+    <style name="TextAppearance.RL.NovelTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="fontFamily">@font/literata_semibold</item>
+        <item name="android:fontFamily">@font/literata_semibold</item>
+        <item name="android:textSize">21sp</item>
+        <item name="android:textColor">@color/rl_text</item>
+    </style>
+
+    <style name="TextAppearance.RL.ToolbarTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="fontFamily">@font/be_vietnam_pro_semibold</item>
+        <item name="android:fontFamily">@font/be_vietnam_pro_semibold</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textColor">@color/rl_text</item>
+    </style>
+
+    <style name="TextAppearance.RL.Title" parent="TextAppearance.Material3.TitleMedium">
+        <item name="fontFamily">@font/be_vietnam_pro_semibold</item>
+        <item name="android:fontFamily">@font/be_vietnam_pro_semibold</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/rl_text</item>
+    </style>
+
+    <style name="TextAppearance.RL.TitleSmall" parent="TextAppearance.Material3.TitleSmall">
+        <item name="fontFamily">@font/be_vietnam_pro_semibold</item>
+        <item name="android:fontFamily">@font/be_vietnam_pro_semibold</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">@color/rl_text</item>
+    </style>
+
+    <style name="TextAppearance.RL.Reading" parent="TextAppearance.Material3.BodyLarge">
+        <item name="fontFamily">@font/literata_regular</item>
+        <item name="android:fontFamily">@font/literata_regular</item>
+        <item name="android:textSize">17sp</item>
+        <item name="android:textColor">@color/rl_upcoming</item>
+    </style>
+
+    <style name="TextAppearance.RL.Sentence" parent="TextAppearance.RL.Reading">
+        <item name="android:textSize">23sp</item>
+        <item name="android:textColor">@color/rl_text</item>
+    </style>
+
+    <style name="TextAppearance.RL.SentenceSide" parent="TextAppearance.RL.Reading">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/rl_heard</item>
+    </style>
+
+    <style name="TextAppearance.RL.BodyLarge" parent="TextAppearance.Material3.BodyLarge">
+        <item name="fontFamily">@font/be_vietnam_pro_regular</item>
+        <item name="android:fontFamily">@font/be_vietnam_pro_regular</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/rl_text</item>
+    </style>
+
+    <style name="TextAppearance.RL.Body" parent="TextAppearance.Material3.BodyMedium">
+        <item name="fontFamily">@font/be_vietnam_pro_regular</item>
+        <item name="android:fontFamily">@font/be_vietnam_pro_regular</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">@color/rl_text</item>
+    </style>
+
+    <style name="TextAppearance.RL.Meta" parent="TextAppearance.Material3.BodySmall">
+        <item name="fontFamily">@font/be_vietnam_pro_regular</item>
+        <item name="android:fontFamily">@font/be_vietnam_pro_regular</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">@color/rl_muted</item>
+    </style>
+
+    <style name="TextAppearance.RL.Small" parent="TextAppearance.Material3.LabelSmall">
+        <item name="fontFamily">@font/be_vietnam_pro_medium</item>
+        <item name="android:fontFamily">@font/be_vietnam_pro_medium</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">@color/rl_muted</item>
+    </style>
+
+    <style name="TextAppearance.RL.Label" parent="TextAppearance.Material3.LabelMedium">
+        <item name="fontFamily">@font/be_vietnam_pro_medium</item>
+        <item name="android:fontFamily">@font/be_vietnam_pro_medium</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">@color/rl_muted</item>
+    </style>
+
+    <style name="TextAppearance.RL.Section" parent="TextAppearance.Material3.LabelMedium">
+        <item name="fontFamily">@font/be_vietnam_pro_semibold</item>
+        <item name="android:fontFamily">@font/be_vietnam_pro_semibold</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.09</item>
+        <item name="android:textColor">@color/rl_muted</item>
+    </style>
+
+    <style name="TextAppearance.RL.Button" parent="TextAppearance.Material3.LabelLarge">
+        <item name="fontFamily">@font/be_vietnam_pro_semibold</item>
+        <item name="android:fontFamily">@font/be_vietnam_pro_semibold</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="TextAppearance.RL.Tab" parent="TextAppearance.Material3.TitleSmall">
+        <item name="fontFamily">@font/be_vietnam_pro_semibold</item>
+        <item name="android:fontFamily">@font/be_vietnam_pro_semibold</item>
+        <item name="android:textSize">15sp</item>
+        <item name="textAllCaps">false</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+
+    <style name="TextAppearance.RL.NavLabel" parent="TextAppearance.Material3.LabelMedium">
+        <item name="fontFamily">@font/be_vietnam_pro_semibold</item>
+        <item name="android:fontFamily">@font/be_vietnam_pro_semibold</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <style name="TextAppearance.RL.Cover" parent="TextAppearance.RL.NovelTitle" />
+
+    <!-- Surfaces: layered by colour and a 1dp line, no elevation. -->
+    <style name="Widget.RL.Card" parent="Widget.Material3.CardView.Outlined">
+        <item name="cardBackgroundColor">@color/rl_surface</item>
+        <item name="strokeColor">@color/rl_line</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="cardCornerRadius">22dp</item>
+        <item name="cardElevation">0dp</item>
+    </style>
+
+    <style name="Widget.RL.Card.Inner">
+        <item name="cardCornerRadius">16dp</item>
+    </style>
+
+    <style name="Widget.RL.Card.Raised">
+        <item name="cardBackgroundColor">@color/rl_surface_2</item>
+        <item name="strokeWidth">0dp</item>
+    </style>
+
+    <style name="Widget.RL.Toolbar" parent="Widget.Material3.Toolbar">
+        <item name="android:background">@android:color/transparent</item>
+        <item name="titleTextAppearance">@style/TextAppearance.RL.ToolbarTitle</item>
+        <item name="subtitleTextAppearance">@style/TextAppearance.RL.Meta</item>
+        <item name="navigationIconTint">@color/rl_text</item>
+    </style>
+
+    <!-- Buttons: the main action is amber and fully rounded. -->
+    <style name="Widget.RL.Button.Primary" parent="Widget.Material3.Button">
+        <item name="backgroundTint">@color/button_primary_bg</item>
+        <item name="android:textColor">@color/rl_on_accent</item>
+        <item name="iconTint">@color/rl_on_accent</item>
+        <item name="android:textAppearance">@style/TextAppearance.RL.Button</item>
+        <item name="android:minHeight">52dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="cornerRadius">26dp</item>
+        <item name="iconGravity">textStart</item>
+        <item name="iconSize">18dp</item>
+    </style>
+
+    <style name="Widget.RL.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="strokeColor">@color/rl_track</item>
+        <item name="android:textColor">@color/rl_text</item>
+        <item name="iconTint">@color/rl_text</item>
+        <item name="android:textAppearance">@style/TextAppearance.RL.Button</item>
+        <item name="android:minHeight">52dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="cornerRadius">26dp</item>
+    </style>
+
+    <style name="Widget.RL.Button.Text" parent="Widget.Material3.Button.TextButton">
+        <item name="android:textColor">@color/rl_accent</item>
+        <item name="android:textAppearance">@style/TextAppearance.RL.Button</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+
+    <!-- A tile with an icon over a short label, used for shortcuts and the player's quick actions. -->
+    <style name="Widget.RL.Button.Tile" parent="Widget.Material3.Button.TextButton.Icon">
+        <item name="backgroundTint">@color/rl_surface</item>
+        <item name="strokeColor">@color/rl_line</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="cornerRadius">16dp</item>
         <item name="iconGravity">top</item>
-        <item name="iconPadding">4dp</item>
+        <item name="iconPadding">6dp</item>
+        <item name="iconSize">22dp</item>
+        <item name="iconTint">@color/rl_text</item>
+        <item name="android:textColor">@color/rl_muted</item>
+        <item name="android:textAppearance">@style/TextAppearance.RL.Label</item>
         <item name="android:minHeight">64dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
         <item name="android:paddingStart">4dp</item>
         <item name="android:paddingEnd">4dp</item>
+        <item name="android:maxLines">1</item>
+    </style>
+
+    <style name="Widget.RL.IconButton" parent="Widget.Material3.Button.IconButton">
+        <item name="iconTint">@color/rl_text</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:insetLeft">0dp</item>
+        <item name="android:insetRight">0dp</item>
+        <!-- Centre the icon whatever the button size; the M3 default pins it 12dp from the start. -->
+        <item name="android:padding">0dp</item>
+        <item name="iconPadding">0dp</item>
+        <item name="iconGravity">textStart</item>
+    </style>
+
+    <style name="Widget.RL.IconButton.Muted">
+        <item name="iconTint">@color/icon_muted</item>
+    </style>
+
+    <style name="Widget.RL.IconButton.Filled" parent="Widget.Material3.Button.IconButton.Filled">
+        <item name="backgroundTint">@color/button_primary_bg</item>
+        <item name="iconTint">@color/rl_on_accent</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:insetLeft">0dp</item>
+        <item name="android:insetRight">0dp</item>
+        <!-- Centre the icon whatever the button size; the M3 default pins it 12dp from the start. -->
+        <item name="android:padding">0dp</item>
+        <item name="iconPadding">0dp</item>
+        <item name="iconGravity">textStart</item>
+    </style>
+
+    <style name="Widget.RL.Chip" parent="Widget.Material3.Chip.Filter">
+        <item name="chipBackgroundColor">@color/chip_bg</item>
+        <item name="chipStrokeColor">@color/chip_stroke</item>
+        <item name="chipStrokeWidth">1dp</item>
+        <item name="android:textColor">@color/chip_text</item>
+        <item name="chipCornerRadius">18dp</item>
+        <item name="chipMinHeight">36dp</item>
+        <item name="checkedIconVisible">false</item>
+        <item name="android:textAppearance">@style/TextAppearance.RL.Body</item>
+        <item name="chipStartPadding">6dp</item>
+        <item name="chipEndPadding">6dp</item>
+    </style>
+
+    <style name="Widget.RL.Slider" parent="Widget.Material3.Slider">
+        <item name="trackColorActive">@color/rl_accent</item>
+        <item name="trackColorInactive">@color/rl_track</item>
+        <item name="thumbColor">@color/rl_text</item>
+        <item name="haloColor">@color/rl_accent_tint</item>
+        <item name="trackHeight">4dp</item>
+        <item name="thumbWidth">18dp</item>
+        <item name="thumbHeight">18dp</item>
+        <item name="thumbTrackGapSize">0dp</item>
+        <item name="trackStopIndicatorSize">0dp</item>
+        <item name="labelBehavior">gone</item>
+        <item name="tickVisible">false</item>
+    </style>
+
+    <style name="Widget.RL.TextView" parent="Widget.MaterialComponents.TextView">
+        <item name="android:textAppearance">@style/TextAppearance.RL.Body</item>
+    </style>
+
+    <style name="Widget.RL.EditText" parent="Widget.AppCompat.EditText">
+        <item name="android:textAppearance">@style/TextAppearance.RL.Body</item>
+    </style>
+
+    <style name="Widget.RL.RadioButton" parent="Widget.Material3.CompoundButton.RadioButton">
+        <item name="android:textAppearance">@style/TextAppearance.RL.Body</item>
+        <item name="buttonTint">@color/nav_item</item>
+    </style>
+
+    <style name="Widget.RL.Progress" parent="Widget.Material3.LinearProgressIndicator">
+        <item name="trackStopIndicatorSize">0dp</item>
+        <item name="indicatorTrackGapSize">0dp</item>
+        <item name="indicatorColor">@color/rl_accent</item>
+        <item name="trackColor">@color/rl_track</item>
+        <item name="trackThickness">4dp</item>
+        <item name="trackCornerRadius">2dp</item>
+    </style>
+
+    <style name="Widget.RL.Tabs" parent="Widget.Material3.TabLayout">
+        <item name="android:background">@android:color/transparent</item>
+        <item name="tabIndicatorColor">@color/rl_accent</item>
+        <item name="tabIndicatorHeight">2dp</item>
+        <item name="tabIndicatorFullWidth">false</item>
+        <item name="tabTextColor">@color/rl_faint</item>
+        <item name="tabSelectedTextColor">@color/rl_text</item>
+        <item name="tabRippleColor">@color/rl_accent_tint</item>
+        <item name="tabTextAppearance">@style/TextAppearance.RL.Tab</item>
+        <item name="tabMode">scrollable</item>
+        <item name="tabGravity">start</item>
+        <item name="tabPaddingStart">0dp</item>
+        <item name="tabPaddingEnd">22dp</item>
+        <item name="tabMinWidth">0dp</item>
+    </style>
+
+    <!-- "+3 mới": chapters published since the list was last caught up with. -->
+    <style name="RL.NewBadge" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/bg_badge_new</item>
+        <item name="android:paddingStart">7dp</item>
+        <item name="android:paddingEnd">7dp</item>
+        <item name="android:paddingTop">1dp</item>
+        <item name="android:paddingBottom">1dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.RL.Small</item>
+        <item name="android:textColor">@color/rl_on_accent</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:maxLines">1</item>
+    </style>
+
+    <style name="Widget.RL.Switch" parent="Widget.Material3.CompoundButton.MaterialSwitch">
+        <item name="thumbTint">@color/switch_thumb</item>
+        <item name="trackTint">@color/switch_track</item>
+        <item name="trackDecorationTint">@android:color/transparent</item>
+    </style>
+
+    <style name="Widget.RL.TextInput" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxBackgroundColor">@color/rl_surface</item>
+        <item name="boxStrokeColor">@color/input_stroke</item>
+        <item name="boxCornerRadiusTopStart">14dp</item>
+        <item name="boxCornerRadiusTopEnd">14dp</item>
+        <item name="boxCornerRadiusBottomStart">14dp</item>
+        <item name="boxCornerRadiusBottomEnd">14dp</item>
+        <item name="hintTextColor">@color/rl_muted</item>
+    </style>
+
+    <style name="Widget.RL.BottomNav" parent="Widget.Material3.BottomNavigationView">
+        <item name="android:background">@color/rl_nav</item>
+        <item name="backgroundTint">@color/rl_nav</item>
+        <item name="itemIconTint">@color/nav_item</item>
+        <item name="itemTextColor">@color/nav_item</item>
+        <item name="itemActiveIndicatorStyle">@style/Widget.RL.BottomNav.Indicator</item>
+        <item name="itemTextAppearanceActive">@style/TextAppearance.RL.NavLabel</item>
+        <item name="itemTextAppearanceInactive">@style/TextAppearance.RL.NavLabel</item>
+        <item name="labelVisibilityMode">labeled</item>
+        <item name="elevation">0dp</item>
+    </style>
+
+    <style name="Widget.RL.BottomNav.Indicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">@color/rl_accent_tint</item>
+    </style>
+
+    <style name="Widget.RL.PopupMenu" parent="Widget.Material3.PopupMenu">
+        <item name="android:popupBackground">@drawable/bg_popup</item>
+    </style>
+
+    <!-- Sheets rise from the bottom with 28dp top corners on the card surface. -->
+    <style name="ThemeOverlay.RL.BottomSheetDialog" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Widget.RL.BottomSheet</item>
+        <item name="android:navigationBarColor">@color/rl_surface</item>
+    </style>
+
+    <style name="Widget.RL.BottomSheet" parent="Widget.Material3.BottomSheet.Modal">
+        <item name="backgroundTint">@color/rl_surface</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.RL.Sheet</item>
+    </style>
+
+    <style name="ShapeAppearance.RL.Sheet" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">28dp</item>
+        <item name="cornerSizeTopRight">28dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+    </style>
+
+    <style name="ThemeOverlay.RL.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="colorSurface">@color/rl_surface</item>
+        <item name="colorSurfaceContainerHigh">@color/rl_surface</item>
+        <item name="materialAlertDialogTitleTextStyle">@style/RL.DialogTitle</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.RL.Button.Text</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.RL.Button.Text</item>
+        <item name="buttonBarNeutralButtonStyle">@style/Widget.RL.Button.Text</item>
+    </style>
+
+    <style name="RL.DialogTitle" parent="MaterialAlertDialog.Material3.Title.Text">
+        <item name="android:textAppearance">@style/TextAppearance.RL.Headline</item>
+    </style>
+    <!-- Quick action tile: an icon or a value over a one-line label. -->
+    <style name="RL.QuickTile" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">@drawable/bg_tile</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:foreground">?attr/selectableItemBackground</item>
+    </style>
+
+    <style name="RL.QuickTile.Icon" parent="">
+        <item name="android:layout_width">22dp</item>
+        <item name="android:layout_height">22dp</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="tint">@color/rl_text</item>
+    </style>
+
+    <style name="RL.QuickTile.Label" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">6dp</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:paddingHorizontal">4dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.RL.Label</item>
+    </style>
+    <!-- Home shortcut tile: icon, title, one line of detail. -->
+    <style name="RL.Shortcut" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:padding">18dp</item>
+        <item name="android:background">@drawable/bg_frame</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:foreground">?attr/selectableItemBackground</item>
+    </style>
+
+    <style name="RL.Shortcut.Icon" parent="">
+        <item name="android:layout_width">24dp</item>
+        <item name="android:layout_height">24dp</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="tint">@color/rl_accent</item>
+    </style>
+
+    <style name="RL.Shortcut.Title" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">16dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.RL.Title</item>
+    </style>
+
+    <style name="RL.Shortcut.Sub" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">2dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.RL.Meta</item>
+    </style>
+    <style name="RL.SectionLabel" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">26dp</item>
+        <item name="android:textAppearance">@style/TextAppearance.RL.Section</item>
+    </style>
+
+    <!-- Settings list row: title and one line of state, a chevron at the end. -->
+    <style name="RL.SettingRow" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">68dp</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingVertical">12dp</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <style name="RL.SettingRow.Texts" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="RL.SettingRow.Title" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textAppearance">@style/TextAppearance.RL.Title</item>
+    </style>
+
+    <style name="RL.SettingRow.Sub" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">3dp</item>
         <item name="android:maxLines">2</item>
-        <item name="android:textAppearance">?attr/textAppearanceLabelMedium</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:textAppearance">@style/TextAppearance.RL.Meta</item>
+    </style>
+
+    <style name="RL.SettingRow.Chevron" parent="">
+        <item name="android:layout_width">22dp</item>
+        <item name="android:layout_height">22dp</item>
+        <item name="android:layout_marginStart">12dp</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="tint">@color/rl_muted</item>
+    </style>
+
+    <style name="RL.Divider" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">1dp</item>
+        <item name="android:background">@color/rl_line</item>
     </style>
 </resources>

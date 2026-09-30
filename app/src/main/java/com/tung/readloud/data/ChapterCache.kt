@@ -26,6 +26,8 @@ class ChapterCache(context: Context) {
         )
     }.getOrNull()
 
+    fun contains(url: String): Boolean = file(url).exists()
+
     fun put(chapter: Chapter) {
         val json = JSONObject()
             .put("url", chapter.url)

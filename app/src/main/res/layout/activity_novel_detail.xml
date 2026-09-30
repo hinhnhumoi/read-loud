@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The frame keeps everything below the status bar, so the header does not scroll up behind it. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/rl_bg"
+    android:fitsSystemWindows="true">
+
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/rl_bg"
+        app:elevation="0dp"
+        app:liftOnScroll="false">
+
+        <!-- Scrolls away as the chapter list is scrolled; the tabs stay. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            app:layout_scrollFlags="scroll">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="8dp"
+                android:paddingTop="4dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBack"
+                    style="@style/Widget.RL.IconButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:contentDescription="@string/action_back"
+                    app:icon="@drawable/ic_chevron_left"
+                    app:iconSize="24dp" />
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMore"
+                    style="@style/Widget.RL.IconButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:contentDescription="@string/detail_more"
+                    app:icon="@drawable/ic_more_vert"
+                    app:iconSize="24dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingHorizontal="@dimen/screen_margin"
+                android:paddingTop="4dp">
+
+                <com.tung.readloud.ui.CoverView
+                    android:id="@+id/cover"
+                    android:layout_width="104dp"
+                    android:layout_height="144dp" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="18dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:paddingTop="6dp">
+
+                    <TextView
+                        android:id="@+id/name"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:maxLines="3"
+                        android:ellipsize="end"
+                        android:textAppearance="@style/TextAppearance.RL.Headline"
+                        tools:text="Toàn Chức Cao Thủ" />
+
+                    <TextView
+                        android:id="@+id/source"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:maxLines="1"
+                        android:ellipsize="end"
+                        android:textAppearance="@style/TextAppearance.RL.Meta"
+                        android:textColor="@color/rl_faint"
+                        tools:text="Truyện web · site-truyen" />
+
+                    <TextView
+                        android:id="@+id/chapters"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textAppearance="@style/TextAppearance.RL.Meta"
+                        tools:text="1728 chương · đã nghe 191" />
+
+                    <TextView
+                        android:id="@+id/listened"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textAppearance="@style/TextAppearance.RL.Meta"
+                        tools:text="Tổng thời gian nghe 41 giờ" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="@dimen/screen_margin">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnListen"
+                    style="@style/Widget.RL.Button.Primary"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    app:icon="@drawable/ic_play"
+                    tools:text="Nghe tiếp chương 192" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDownload"
+                    style="@style/Widget.RL.IconButton"
+                    android:layout_width="52dp"
+                    android:layout_height="52dp"
+                    android:layout_marginStart="10dp"
+                    android:contentDescription="@string/detail_download"
+                    app:icon="@drawable/ic_download"
+                    app:iconSize="22dp"
+                    app:iconTint="@color/rl_offline"
+                    app:strokeColor="@color/rl_track"
+                    app:strokeWidth="1dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/followCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/screen_margin"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_search"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="12dp">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_bell"
+                    app:tint="@color/rl_accent" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="12dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/follow_title"
+                        android:textAppearance="@style/TextAppearance.RL.TitleSmall" />
+
+                    <TextView
+                        android:id="@+id/followHint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/follow_hint"
+                        android:textAppearance="@style/TextAppearance.RL.Meta"
+                        android:textColor="@color/rl_faint" />
+                </LinearLayout>
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/followSwitch"
+                    style="@style/Widget.RL.Switch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/tabs"
+            style="@style/Widget.RL.Tabs"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginHorizontal="@dimen/screen_margin"
+            android:layout_marginTop="16dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginHorizontal="@dimen/screen_margin"
+            android:background="@color/rl_surface_2" />
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <!-- Mục lục -->
+        <LinearLayout
+            android:id="@+id/tocPane"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <EditText
+                android:id="@+id/jump"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginHorizontal="@dimen/screen_margin"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="4dp"
+                android:background="@drawable/bg_search"
+                android:drawableStart="@drawable/ic_search"
+                android:drawablePadding="10dp"
+                android:drawableTint="@color/rl_faint"
+                android:hint="@string/toc_jump_hint"
+                android:imeOptions="actionSearch"
+                android:importantForAutofill="no"
+                android:inputType="text"
+                android:maxLines="1"
+                android:paddingHorizontal="12dp"
+                android:textAppearance="@style/TextAppearance.RL.Body"
+                android:textColorHint="@color/rl_faint"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/tocList"
+                    android:defaultFocusHighlightEnabled="false"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingHorizontal="@dimen/screen_margin"
+                    android:paddingBottom="24dp"
+                    android:scrollbars="vertical"
+                    tools:listitem="@layout/item_chapter" />
+
+                <LinearLayout
+                    android:id="@+id/tocStatusGroup"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:padding="32dp"
+                    android:visibility="gone"
+                    tools:visibility="visible">
+
+                    <com.google.android.material.progressindicator.CircularProgressIndicator
+                        android:id="@+id/tocProgress"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:indeterminate="true"
+                        app:indicatorColor="@color/rl_accent"
+                        app:trackColor="@android:color/transparent" />
+
+                    <TextView
+                        android:id="@+id/tocStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:gravity="center"
+                        android:textAppearance="@style/TextAppearance.RL.Body"
+                        android:textColor="@color/rl_muted"
+                        tools:text="Đang tìm trang mục lục…" />
+
+                    <LinearLayout
+                        android:id="@+id/tocActions"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="20dp"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnFindToc"
+                            style="@style/Widget.RL.Button.Primary"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/toc_find" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnPasteToc"
+                            style="@style/Widget.RL.Button.Outlined"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:layout_weight="1"
+                            android:text="@string/toc_change_url" />
+                    </LinearLayout>
+                </LinearLayout>
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Đánh dấu -->
+        <FrameLayout
+            android:id="@+id/marksPane"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/marksList"
+                android:defaultFocusHighlightEnabled="false"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingHorizontal="@dimen/screen_margin"
+                android:paddingTop="10dp"
+                android:paddingBottom="24dp"
+                tools:listitem="@layout/item_bookmark" />
+
+            <TextView
+                android:id="@+id/marksEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:padding="32dp"
+                android:text="@string/marks_empty"
+                android:textAppearance="@style/TextAppearance.RL.Body"
+                android:textColor="@color/rl_muted"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <!-- Cài đặt riêng -->
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/ownPane"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="@dimen/screen_margin"
+                android:paddingTop="6dp"
+                android:paddingBottom="24dp">
+
+                <LinearLayout
+                    android:id="@+id/ownVoiceRow"
+                    style="@style/RL.SettingRow">
+
+                    <LinearLayout style="@style/RL.SettingRow.Texts">
+
+                        <TextView
+                            style="@style/RL.SettingRow.Title"
+                            android:text="@string/own_voice" />
+
+                        <TextView
+                            android:id="@+id/ownVoiceNote"
+                            style="@style/RL.SettingRow.Sub"
+                            android:text="@string/own_voice_system_note"
+                            android:visibility="gone" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/ownVoiceValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:textAppearance="@style/TextAppearance.RL.Body"
+                        android:textColor="@color/rl_muted"
+                        tools:text="Nam Minh" />
+                </LinearLayout>
+
+                <View style="@style/RL.Divider" />
+
+                <LinearLayout
+                    android:id="@+id/ownSpeedRow"
+                    style="@style/RL.SettingRow">
+
+                    <LinearLayout style="@style/RL.SettingRow.Texts">
+
+                        <TextView
+                            style="@style/RL.SettingRow.Title"
+                            android:text="@string/own_speed" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/ownSpeedValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:textAppearance="@style/TextAppearance.RL.Body"
+                        android:textColor="@color/rl_muted"
+                        tools:text="1.4×" />
+                </LinearLayout>
+
+                <View style="@style/RL.Divider" />
+
+                <LinearLayout
+                    android:id="@+id/ownRulesRow"
+                    style="@style/RL.SettingRow">
+
+                    <LinearLayout style="@style/RL.SettingRow.Texts">
+
+                        <TextView
+                            style="@style/RL.SettingRow.Title"
+                            android:text="@string/own_rules" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/ownRulesValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:textAppearance="@style/TextAppearance.RL.Body"
+                        android:textColor="@color/rl_muted"
+                        tools:text="5 quy tắc" />
+                </LinearLayout>
+
+                <View style="@style/RL.Divider" />
+
+                <LinearLayout
+                    android:id="@+id/ownSkipRow"
+                    style="@style/RL.SettingRow">
+
+                    <LinearLayout style="@style/RL.SettingRow.Texts">
+
+                        <TextView
+                            style="@style/RL.SettingRow.Title"
+                            android:text="@string/own_skip_notes" />
+
+                        <TextView
+                            style="@style/RL.SettingRow.Sub"
+                            android:text="@string/own_skip_notes_hint" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/ownSkipSwitch"
+                        style="@style/Widget.RL.Switch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp" />
+                </LinearLayout>
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+    </FrameLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
+</FrameLayout>

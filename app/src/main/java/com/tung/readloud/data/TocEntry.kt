@@ -23,4 +23,7 @@ interface TocDao {
 
     @Insert
     suspend fun insertAll(entries: List<TocEntry>)
+
+    @Query("SELECT COUNT(*) FROM toc_entries WHERE novelId = :novelId")
+    suspend fun count(novelId: Long): Int
 }

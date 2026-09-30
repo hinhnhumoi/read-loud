@@ -12,8 +12,8 @@ android {
         applicationId = "com.tung.readloud"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.12"
+        versionCode = 16
+        versionName = "0.16"
     }
 
     buildTypes {
@@ -46,6 +46,7 @@ dependencies {
     implementation("androidx.media:media:1.7.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")

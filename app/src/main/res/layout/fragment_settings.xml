@@ -1,0 +1,397 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clipToPadding="false"
+    android:paddingBottom="@dimen/mini_player_inset">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="@dimen/screen_margin"
+        android:paddingTop="20dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_title"
+            android:textAppearance="@style/TextAppearance.RL.Display" />
+
+        <!-- Voice source -->
+        <TextView
+            style="@style/RL.SectionLabel"
+            android:text="@string/settings_source" />
+
+        <com.tung.readloud.ui.SegmentedControl
+            android:id="@+id/engineSegment"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" />
+
+        <TextView
+            android:id="@+id/engineDesc"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textAppearance="@style/TextAppearance.RL.Meta"
+            tools:text="@string/settings_edge_desc" />
+
+        <LinearLayout
+            android:id="@+id/onlineVoices"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="vertical" />
+
+        <LinearLayout
+            android:id="@+id/azureSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/voice_azure_key"
+                app:endIconMode="password_toggle">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/azureKey"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPassword"
+                    android:maxLines="1" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:hint="@string/voice_azure_region">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/azureRegion"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text"
+                    android:maxLines="1" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+
+        <!-- Phone voice: the main voice, or the stand-in when the online one fails. -->
+        <LinearLayout
+            android:id="@+id/systemToggleRow"
+            style="@style/RL.SettingRow"
+            android:layout_marginTop="8dp">
+
+            <LinearLayout style="@style/RL.SettingRow.Texts">
+
+                <TextView
+                    android:id="@+id/systemTitle"
+                    style="@style/RL.SettingRow.Title"
+                    android:text="@string/voice_system_title_fallback" />
+
+                <TextView
+                    android:id="@+id/systemSummary"
+                    style="@style/RL.SettingRow.Sub"
+                    tools:text="Mặc định của engine" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/systemChevron"
+                style="@style/RL.SettingRow.Chevron"
+                android:src="@drawable/ic_chevron_down" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/systemSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:hint="@string/voice_system_engine"
+                app:boxBackgroundColor="@color/rl_surface"
+                app:boxCornerRadiusBottomEnd="14dp"
+                app:boxCornerRadiusBottomStart="14dp"
+                app:boxCornerRadiusTopEnd="14dp"
+                app:boxCornerRadiusTopStart="14dp"
+                app:boxStrokeColor="@color/input_stroke">
+
+                <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                    android:id="@+id/engineDropdown"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="none" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <TextView
+                android:id="@+id/systemVoiceStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/voice_loading"
+                android:textAppearance="@style/TextAppearance.RL.Meta" />
+
+            <RadioGroup
+                android:id="@+id/systemVoiceGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/voice_system_tip"
+                android:textAppearance="@style/TextAppearance.RL.Meta"
+                android:textColor="@color/rl_faint" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPreviewSystem"
+                    style="@style/Widget.RL.Button.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="10dp"
+                    android:layout_weight="1"
+                    android:minHeight="46dp"
+                    android:text="@string/voice_preview"
+                    app:icon="@drawable/ic_play"
+                    app:iconSize="16dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTtsSettings"
+                    style="@style/Widget.RL.Button.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:minHeight="46dp"
+                    android:text="@string/voice_open_tts_settings"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- How it reads -->
+        <TextView
+            style="@style/RL.SectionLabel"
+            android:text="@string/settings_style" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/label_rate"
+                android:textAppearance="@style/TextAppearance.RL.BodyLarge" />
+
+            <TextView
+                android:id="@+id/rateValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="@style/TextAppearance.RL.Title"
+                android:textColor="@color/rl_accent"
+                tools:text="1.3×" />
+        </LinearLayout>
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/rateSlider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="-10dp"
+            android:contentDescription="@string/label_rate"
+            android:stepSize="0.1"
+            android:value="1.0"
+            android:valueFrom="0.5"
+            android:valueTo="2.0" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/rateChips"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:chipSpacingHorizontal="8dp"
+            app:singleLine="true"
+            app:singleSelection="true">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/rate10"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="1.0×" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/rate13"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="1.3×" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/rate15"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="1.5×" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/rate20"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="2.0×" />
+        </com.google.android.material.chip.ChipGroup>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/label_pitch"
+                android:textAppearance="@style/TextAppearance.RL.BodyLarge" />
+
+            <TextView
+                android:id="@+id/pitchValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="@style/TextAppearance.RL.Title"
+                tools:text="1.0" />
+        </LinearLayout>
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/pitchSlider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="-10dp"
+            android:contentDescription="@string/label_pitch"
+            android:stepSize="0.1"
+            android:value="1.0"
+            android:valueFrom="0.5"
+            android:valueTo="1.5" />
+
+        <!-- Buffer ahead -->
+        <TextView
+            android:id="@+id/bufferLabel"
+            style="@style/RL.SectionLabel"
+            android:text="@string/buffer_title" />
+
+        <com.tung.readloud.ui.SegmentedControl
+            android:id="@+id/bufferSegment"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" />
+
+        <TextView
+            android:id="@+id/bufferHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/settings_buffer_hint"
+            android:textAppearance="@style/TextAppearance.RL.Meta" />
+
+        <!-- More -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="24dp"
+            android:background="@color/rl_line" />
+
+        <LinearLayout
+            android:id="@+id/rowRules"
+            style="@style/RL.SettingRow">
+
+            <LinearLayout style="@style/RL.SettingRow.Texts">
+
+                <TextView
+                    style="@style/RL.SettingRow.Title"
+                    android:text="@string/rules_title" />
+
+                <TextView
+                    android:id="@+id/rulesSummary"
+                    style="@style/RL.SettingRow.Sub"
+                    tools:text="12 quy tắc · HP → máu, Lv → cấp" />
+            </LinearLayout>
+
+            <ImageView
+                style="@style/RL.SettingRow.Chevron"
+                android:src="@drawable/ic_chevron_right" />
+        </LinearLayout>
+
+        <View style="@style/RL.Divider" />
+
+        <LinearLayout
+            android:id="@+id/rowHealth"
+            style="@style/RL.SettingRow">
+
+            <LinearLayout style="@style/RL.SettingRow.Texts">
+
+                <TextView
+                    style="@style/RL.SettingRow.Title"
+                    android:text="@string/settings_health" />
+
+                <TextView
+                    android:id="@+id/healthSummary"
+                    style="@style/RL.SettingRow.Sub"
+                    tools:text="Cần cho phép chạy nền" />
+            </LinearLayout>
+
+            <ImageView
+                style="@style/RL.SettingRow.Chevron"
+                android:src="@drawable/ic_chevron_right" />
+        </LinearLayout>
+
+        <View style="@style/RL.Divider" />
+
+        <LinearLayout
+            android:id="@+id/rowLog"
+            style="@style/RL.SettingRow">
+
+            <LinearLayout style="@style/RL.SettingRow.Texts">
+
+                <TextView
+                    style="@style/RL.SettingRow.Title"
+                    android:text="@string/event_log_title" />
+
+                <TextView
+                    style="@style/RL.SettingRow.Sub"
+                    android:text="@string/settings_log_sub" />
+            </LinearLayout>
+
+            <ImageView
+                style="@style/RL.SettingRow.Chevron"
+                android:src="@drawable/ic_chevron_right" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/version"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:gravity="center"
+            android:textAppearance="@style/TextAppearance.RL.Small"
+            android:textColor="@color/rl_faint"
+            tools:text="Phiên bản 0.13" />
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

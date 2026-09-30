@@ -18,6 +18,10 @@ data class LibraryItem(
     /** Zero-based position of the current chapter, when the chapter list is known. */
     val chapterIndex: Int?,
     val chapterCount: Int?,
+    /** The current chapter can be read without a connection: a local book, or a saved web chapter. */
+    val offline: Boolean = isBook,
+    /** Chapters published since the list was last caught up with, not yet listened past. */
+    val newCount: Int = 0,
 ) {
     /** Overall progress from 0 to 1, counting the part of the current chapter already heard. */
     val progress: Float?
@@ -29,9 +33,16 @@ data class LibraryItem(
         }
 }
 
+/** Chapters past both the last list the user had seen and the one they are on. */
+fun newChapters(novel: Novel, tocSize: Int, currentIndex: Int?): Int {
+    val seen = novel.seenTocCount ?: return 0
+    return (tocSize - maxOf(seen, (currentIndex ?: -1) + 1)).coerceAtLeast(0)
+}
+
 class LibraryRepository(context: Context) {
     private val db = AppDatabase.get(context)
     private val books = BookStore(context)
+    private val chapters = ChapterCache(context)
 
     val items: Flow<List<LibraryItem>> = db.novels().observeAll()
         .map { novels: List<Novel> -> novels.map { toItem(it) } }
@@ -58,6 +69,8 @@ class LibraryRepository(context: Context) {
             source = novel.host,
             chapterIndex = index,
             chapterCount = entries.size.takeIf { it > 0 },
+            offline = chapters.contains(novel.currentUrl),
+            newCount = newChapters(novel, entries.size, index),
         )
     }
 }

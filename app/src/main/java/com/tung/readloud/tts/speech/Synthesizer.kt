@@ -8,16 +8,18 @@ interface Synthesizer {
     suspend fun synthesize(text: String, voice: String): ByteArray
 }
 
-data class OnlineVoice(val id: String, val label: String)
+data class OnlineVoice(val id: String, val label: String, val name: String, val description: String)
 
 object OnlineVoices {
     const val DEFAULT = "vi-VN-HoaiMyNeural"
     val all = listOf(
-        OnlineVoice("vi-VN-HoaiMyNeural", "HoaiMy (nữ)"),
-        OnlineVoice("vi-VN-NamMinhNeural", "NamMinh (nam)"),
+        OnlineVoice("vi-VN-HoaiMyNeural", "HoaiMy (nữ)", "Hoài My", "Nữ · miền Bắc · neural"),
+        OnlineVoice("vi-VN-NamMinhNeural", "NamMinh (nam)", "Nam Minh", "Nam · miền Bắc · neural"),
     )
 
     fun label(id: String): String = all.firstOrNull { it.id == id }?.label ?: id
+
+    fun name(id: String): String = all.firstOrNull { it.id == id }?.name ?: id
 }
 
 object Http {

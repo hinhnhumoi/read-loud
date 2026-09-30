@@ -30,6 +30,26 @@ class TextNormalizerTest {
     }
 
     @Test
+    fun dropsAuthorNoteAtChapterEnd() {
+        val story = List(9) { "Đoạn truyện số ${it + 1}, Diệp Tu ngồi xuống máy số mười." }
+        assertEquals(story, TextNormalizer.dropAuthorNotes(story + listOf("———", "Lời tác giả: tuần này ra ít chương.", "Cảm ơn mọi người.")))
+        assertEquals(story, TextNormalizer.dropAuthorNotes(story + listOf("PS: Mai tác giả đi du lịch.")))
+        assertEquals(story, TextNormalizer.dropAuthorNotes(story + listOf("(Tác giả có lời muốn nói: cảm ơn các bạn đã đề cử)")))
+        assertEquals(story, TextNormalizer.dropAuthorNotes(story + listOf("A/N: next chapter on Friday")))
+    }
+
+    @Test
+    fun keepsStoryThatOnlyMentionsAnAuthor() {
+        val story = listOf(
+            "Tác giả: Hồ Điệp Lam — dòng chữ in trên bìa cuốn sách cũ mà hắn nhặt được.",
+            "Hắn lật trang đầu tiên, đọc chậm từng chữ.",
+            "Pssst, có người gọi hắn từ phía sau.",
+            "Hắn quay lại, không thấy ai.",
+        )
+        assertEquals(story, TextNormalizer.dropAuthorNotes(story))
+    }
+
+    @Test
     fun appliesUserRules() {
         val rules = ReplaceRules.compile(
             listOf(

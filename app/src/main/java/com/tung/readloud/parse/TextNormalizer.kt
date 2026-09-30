@@ -19,6 +19,30 @@ object TextNormalizer {
         line.length <= JUNK_MAX_CHARS && junkLines.any { it.containsMatchIn(line) }
     }
 
+    private val authorNoteStart = Regex(
+        "(?iu)^[\\s(\\[【「]*(" +
+            "lời (của )?tác giả|tác giả (có )?(lời|nói)|tác giả\\s*[:：]|tg\\s*[:：]|ghi chú( của tác giả)?\\s*[:：]|" +
+            "p\\s*/\\s*s|p\\.\\s*s\\b|ps\\s*[:：.]|author'?s? notes?|a/n\\b" +
+            ")",
+    )
+    private val separator = Regex("^[\\s\\-–—_*~=+.·•]{3,}$")
+
+    /**
+     * Drops the author's note some sites put after the story: from the first line in the last part of the
+     * chapter that opens like one ("Lời tác giả", "PS:", "A/N"...), or from a separator line just before it.
+     * Never takes more than a third of the chapter, so a story that merely mentions an author is kept.
+     */
+    fun dropAuthorNotes(paragraphs: List<String>): List<String> {
+        val n = paragraphs.size
+        if (n < 2) return paragraphs
+        val from = n - maxOf(1, n / 3)
+        val start = (maxOf(1, from) until n).firstOrNull { authorNoteStart.containsMatchIn(paragraphs[it].trim()) }
+            ?: return paragraphs
+        var cut = start
+        while (cut - 1 >= maxOf(1, from - 1) && separator.matches(paragraphs[cut - 1].trim())) cut--
+        return paragraphs.subList(0, cut)
+    }
+
     private val ellipsis = Regex("\\.{3,}|…+|。{2,}")
     private val repeatedMarks = Regex("([!?])\\1+")
     private val levelNumber = Regex("(?i)\\blv\\.?\\s*(\\d+)")

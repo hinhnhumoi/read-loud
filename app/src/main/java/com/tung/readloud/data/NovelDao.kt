@@ -16,6 +16,33 @@ interface NovelDao {
     @Query("SELECT * FROM novels WHERE id = :id")
     suspend fun findById(id: Long): Novel?
 
+    @Query("SELECT * FROM novels WHERE id = :id")
+    fun observeById(id: Long): Flow<Novel?>
+
+    @Query("SELECT * FROM novels WHERE followNew = 1 AND tocUrl IS NOT NULL")
+    suspend fun followed(): List<Novel>
+
+    @Query("SELECT COUNT(*) FROM novels WHERE followNew = 1")
+    suspend fun followedCount(): Int
+
+    @Query("UPDATE novels SET listenedMs = listenedMs + :ms WHERE id = :id")
+    suspend fun addListened(id: Long, ms: Long)
+
+    @Query("UPDATE novels SET followNew = :on WHERE id = :id")
+    suspend fun setFollow(id: Long, on: Boolean)
+
+    @Query("UPDATE novels SET voice = :voice WHERE id = :id")
+    suspend fun setVoice(id: Long, voice: String?)
+
+    @Query("UPDATE novels SET rate = :rate WHERE id = :id")
+    suspend fun setRate(id: Long, rate: Float?)
+
+    @Query("UPDATE novels SET skipAuthorNotes = :on WHERE id = :id")
+    suspend fun setSkipAuthorNotes(id: Long, on: Boolean)
+
+    @Query("UPDATE novels SET seenTocCount = :count WHERE id = :id AND seenTocCount IS NULL")
+    suspend fun setSeenTocCountIfMissing(id: Long, count: Int)
+
     @Query("SELECT * FROM novels ORDER BY lastReadAt DESC LIMIT 1")
     suspend fun mostRecent(): Novel?
 

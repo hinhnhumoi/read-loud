@@ -35,8 +35,8 @@ class OnlineSpeaker(
 
     override val lookahead = 3
 
-    /** One synthesized piece of a chunk; the chunk is done when its [last] piece finishes. */
-    private class Part(val id: String, val last: Boolean)
+    /** One synthesized piece of a chunk, starting [startFraction] into it; the chunk is done when its [last] piece finishes. */
+    private class Part(val id: String, val last: Boolean, val startFraction: Float)
 
     private class Pending(val part: Part, val text: String, var file: Deferred<File>, var retries: Int = 0)
 
@@ -66,6 +66,7 @@ class OnlineSpeaker(
                 val finished = inPlayer.removeFirstOrNull() ?: return
                 if (currentMediaItemIndex > 0) removeMediaItem(0)
                 if (finished.last) notify { listener.onDone(finished.id) }
+                inPlayer.firstOrNull()?.let { next -> notify { listener.onProgress(next.id, next.startFraction) } }
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -113,8 +114,12 @@ class OnlineSpeaker(
     override fun enqueue(utteranceId: String, text: String) {
         val gen = generation
         val pieces = splitForSynthesis(text)
+        val total = pieces.sumOf { it.length }.coerceAtLeast(1)
+        var before = 0
         pieces.forEachIndexed { i, piece ->
-            val entry = Pending(Part(utteranceId, i == pieces.lastIndex), piece, cache.request(synthesizer, voice, piece))
+            val part = Part(utteranceId, i == pieces.lastIndex, before.toFloat() / total)
+            before += piece.length
+            val entry = Pending(part, piece, cache.request(synthesizer, voice, piece))
             pending.addLast(entry)
             awaitThenPump(entry.file, gen)
         }
@@ -159,6 +164,8 @@ class OnlineSpeaker(
                 .build()
             inPlayer.addLast(head.part)
             if (player.mediaItemCount == 0) {
+                val part = head.part
+                notify { listener.onProgress(part.id, part.startFraction) }
                 player.setMediaItem(item)
                 player.prepare()
                 if (!paused) player.play()
@@ -236,6 +243,10 @@ class OnlineSpeaker(
         paused = false
         if (player.mediaItemCount > 0) player.play() else pump()
         return true
+    }
+
+    override fun setVolume(volume: Float) {
+        player.volume = volume
     }
 
     override fun release() {

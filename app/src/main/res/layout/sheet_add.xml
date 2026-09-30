@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="@dimen/screen_margin"
+    android:paddingBottom="24dp">
+
+    <View
+        android:layout_width="36dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_sheet_handle" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="@string/action_add"
+        android:textAppearance="@style/TextAppearance.RL.Display"
+        android:textSize="28sp" />
+
+    <!-- A link found on the clipboard -->
+    <LinearLayout
+        android:id="@+id/clipCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/bg_clip_card"
+        android:orientation="vertical"
+        android:padding="18dp"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:drawablePadding="10dp"
+            android:gravity="center_vertical"
+            android:text="@string/add_clipboard_found"
+            android:textAppearance="@style/TextAppearance.RL.Section"
+            android:textColor="@color/rl_accent"
+            app:drawableStartCompat="@drawable/ic_clipboard"
+            app:drawableTint="@color/rl_accent" />
+
+        <TextView
+            android:id="@+id/clipTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textAppearance="@style/TextAppearance.RL.Title"
+            android:textSize="17sp"
+            tools:text="Toàn Chức Cao Thủ" />
+
+        <TextView
+            android:id="@+id/clipUrl"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="middle"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.RL.Meta"
+            android:textColor="@color/rl_faint"
+            tools:text="alldiepall.wordpress.com/2015/05/01/tcct-chuong-192/" />
+
+        <TextView
+            android:id="@+id/clipStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textAppearance="@style/TextAppearance.RL.Meta"
+            android:textColor="@color/rl_offline"
+            tools:text="@string/add_in_library" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnReadClip"
+            style="@style/Widget.RL.Button.Primary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/action_read_now"
+            app:icon="@drawable/ic_play" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/orPaste"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="@string/add_or_paste"
+        android:textAppearance="@style/TextAppearance.RL.Body"
+        android:textColor="@color/rl_muted" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="horizontal">
+
+        <EditText
+            android:id="@+id/urlInput"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_input"
+            android:hint="@string/add_url_hint"
+            android:imeOptions="actionGo"
+            android:importantForAutofill="no"
+            android:inputType="textUri"
+            android:maxLines="1"
+            android:paddingHorizontal="16dp"
+            android:textAppearance="@style/TextAppearance.RL.Body"
+            android:textColorHint="@color/rl_faint" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnGo"
+            style="@style/Widget.RL.IconButton"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_marginStart="10dp"
+            android:contentDescription="@string/action_read_url"
+            app:backgroundTint="@color/rl_surface_3"
+            app:cornerRadius="16dp"
+            app:icon="@drawable/ic_arrow_right"
+            app:iconSize="22dp" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/add_hint"
+        android:textAppearance="@style/TextAppearance.RL.Meta"
+        android:textColor="@color/rl_faint" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnOpenFile"
+            style="@style/Widget.RL.Button.Outlined"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="10dp"
+            android:layout_weight="1"
+            android:minHeight="56dp"
+            android:text="@string/add_open_file"
+            app:cornerRadius="16dp"
+            app:icon="@drawable/ic_file"
+            app:iconGravity="textStart"
+            app:iconTint="@color/rl_accent" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPasteText"
+            style="@style/Widget.RL.Button.Outlined"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="56dp"
+            android:text="@string/add_paste_text"
+            app:cornerRadius="16dp"
+            app:icon="@drawable/ic_text_lines"
+            app:iconGravity="textStart"
+            app:iconTint="@color/rl_accent" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="@string/add_footer"
+        android:textAppearance="@style/TextAppearance.RL.Meta"
+        android:textColor="@color/rl_faint" />
+</LinearLayout>

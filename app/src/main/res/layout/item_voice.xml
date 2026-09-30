@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/voiceCard"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="10dp"
+    android:background="@drawable/bg_voice_card"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground"
+    android:gravity="center_vertical"
+    android:minHeight="68dp"
+    android:orientation="horizontal"
+    android:paddingVertical="10dp"
+    android:paddingStart="18dp"
+    android:paddingEnd="12dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/voiceName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.RL.Title"
+            tools:text="Hoài My" />
+
+        <TextView
+            android:id="@+id/voiceDesc"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textAppearance="@style/TextAppearance.RL.Meta"
+            tools:text="Nữ · miền Bắc · neural" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="44dp"
+        android:layout_height="44dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/voicePlay"
+            style="@style/Widget.Material3.Button.IconButton.Outlined"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:cornerRadius="22dp"
+            app:icon="@drawable/ic_play"
+            app:iconSize="18dp"
+            app:iconTint="@color/rl_text"
+            app:strokeColor="@color/rl_track" />
+
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:id="@+id/voiceLoading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:indeterminate="true"
+            android:visibility="gone"
+            app:indicatorColor="@color/rl_accent"
+            app:indicatorSize="40dp"
+            app:trackColor="@android:color/transparent"
+            app:trackThickness="3dp" />
+    </FrameLayout>
+</LinearLayout>

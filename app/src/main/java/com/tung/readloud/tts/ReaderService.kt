@@ -23,6 +23,9 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.speech.tts.TextToSpeech
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
@@ -33,25 +36,28 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import androidx.media.session.MediaButtonReceiver
 import com.tung.readloud.R
+import com.tung.readloud.book.BookStore
+import com.tung.readloud.book.BookUrl
 import com.tung.readloud.data.ChapterCache
+import com.tung.readloud.data.CompiledRule
 import com.tung.readloud.data.EventLog
+import com.tung.readloud.data.Novel
 import com.tung.readloud.data.NovelRepository
 import com.tung.readloud.data.ProgressStore
+import com.tung.readloud.data.ReplaceRule
+import com.tung.readloud.data.ReplaceRules
+import com.tung.readloud.data.RuleRepository
 import com.tung.readloud.data.VoiceEngine
 import com.tung.readloud.data.VoiceSettings
+import com.tung.readloud.data.applyingTo
 import com.tung.readloud.fetch.ChallengeRequiredException
 import com.tung.readloud.fetch.PageFetcher
 import com.tung.readloud.model.Chapter
 import com.tung.readloud.parse.ChapterParser
 import com.tung.readloud.parse.NextChapterFinder
-import com.tung.readloud.parse.TocParser
-import com.tung.readloud.book.BookStore
-import com.tung.readloud.book.BookUrl
-import com.tung.readloud.data.CompiledRule
-import com.tung.readloud.data.ReplaceRules
-import com.tung.readloud.data.RuleRepository
 import com.tung.readloud.parse.TextChunker
 import com.tung.readloud.parse.TextNormalizer
+import com.tung.readloud.parse.TocParser
 import com.tung.readloud.tts.speech.AudioCache
 import com.tung.readloud.tts.speech.AzureSynthesizer
 import com.tung.readloud.tts.speech.EdgeSynthesizer
@@ -62,6 +68,9 @@ import com.tung.readloud.tts.speech.Synthesizer
 import com.tung.readloud.tts.speech.SystemSpeaker
 import com.tung.readloud.ui.MainActivity
 import com.tung.readloud.ui.VerifyActivity
+import java.io.IOException
+import java.net.URI
+import java.time.LocalDateTime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -70,17 +79,15 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import java.io.IOException
-import java.net.URI
 
 /**
  * Foreground service that reads chapters aloud, prefetches the next chapter and keeps going until no
@@ -97,9 +104,16 @@ class ReaderService : Service() {
     private val ruleRepository by lazy { RuleRepository(this) }
     private val bookStore by lazy { BookStore(this) }
 
-    /** The user's pronunciation rules, kept current while the service runs. */
+    /** The user's pronunciation rules that apply to the novel being read, kept current while the service runs. */
     @Volatile
     private var rules: List<CompiledRule> = emptyList()
+    private var allRules: List<ReplaceRule> = emptyList()
+
+    /** The library row of the novel being read, for its own voice, speed and text settings. */
+    private var novelRow: Novel? = null
+    private var globalRate = ProgressStore.DEFAULT_RATE
+    private var listenStartedAt = 0L
+    private var listenNovelId: Long? = null
     private val chapterCache by lazy { ChapterCache(this) }
     private val audioCache by lazy { AudioCache(this, scope) }
 
@@ -142,8 +156,19 @@ class ReaderService : Service() {
     private var slowNoteShown = false
     private var speechRate = ProgressStore.DEFAULT_RATE
     private var pitch = ProgressStore.DEFAULT_PITCH
-    private var sleepAfterChapter = false
+    private var sleepChaptersLeft = 0
+
+    /** When the current chunk started playing from its beginning, for measuring how fast the voice reads. */
+    private var chunkStartedAt = 0L
+    private var chunkStartedFor = -1
+
+    /** Measured characters per second at 1.0x for the voice in use; 0 until known. */
+    private var measuredSpeed = 0f
     private val sleepRunnable = Runnable { onSleepTimer() }
+    private val sleepFader by lazy {
+        SleepFader(this, mainHandler, ::sleepSecondsLeft, { speaker?.setVolume(it) }, ::extendSleepByShake)
+    }
+    private var autoSleepAtNight = false
 
     private val audioAttributes = AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -165,6 +190,16 @@ class ReaderService : Service() {
             val (seq, n) = parseId(utteranceId) ?: return
             if (seq != chapterSeq) return
             if (fatal && !usingFallback) fallbackToSystem(message) else onChunkError(seq, n)
+        }
+
+        override fun onProgress(utteranceId: String, fraction: Float) {
+            val (seq, n) = parseId(utteranceId) ?: return
+            if (seq != chapterSeq || n != index) return
+            if (fraction == 0f && _state.value.status == PlaybackStatus.PLAYING) {
+                chunkStartedAt = SystemClock.elapsedRealtime()
+                chunkStartedFor = n
+            }
+            setState { copy(chunkProgress = fraction.coerceIn(0f, 1f), progressAt = SystemClock.elapsedRealtime()) }
         }
 
         override fun onStall(waiting: Boolean) {
@@ -215,7 +250,16 @@ class ReaderService : Service() {
             audioCache.trim()
             chapterCache.trim()
         }
-        scope.launch { ruleRepository.rules.collect { rules = ReplaceRules.compile(it) } }
+        scope.launch {
+            ruleRepository.rules.collect {
+                allRules = it
+                compileRules()
+            }
+        }
+        scope.launch { library.novels.collect { list -> onNovelRow(list.firstOrNull { it.id == novelId }) } }
+        scope.launch { store.sleepFade.collect { sleepFader.fadeEnabled = it } }
+        scope.launch { store.sleepShake.collect { sleepFader.shakeEnabled = it } }
+        scope.launch { store.sleepAutoNight.collect { autoSleepAtNight = it } }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -235,9 +279,16 @@ class ReaderService : Service() {
             ACTION_PREV_CHUNK -> seekChunk(currentIndex() - 1)
             ACTION_NEXT_CHUNK -> seekChunk(currentIndex() + 1)
             ACTION_SEEK_CHUNK -> seekChunk(intent.getIntExtra(EXTRA_INDEX, currentIndex()))
-            ACTION_SET_SLEEP -> setSleep(intent.getIntExtra(EXTRA_SLEEP_MINUTES, 0))
+            ACTION_SET_SLEEP -> {
+                val minutes = intent.getIntExtra(EXTRA_SLEEP_MINUTES, 0)
+                val chapters = intent.getIntExtra(EXTRA_SLEEP_CHAPTERS, if (minutes == SLEEP_END_OF_CHAPTER) 1 else 0)
+                setSleep(if (minutes == SLEEP_END_OF_CHAPTER) 0 else minutes, chapters)
+            }
             ACTION_RELOAD_VOICE -> reloadVoice()
-            ACTION_DOWNLOAD -> startDownload(intent.getIntExtra(EXTRA_COUNT, DEFAULT_DOWNLOAD_COUNT))
+            ACTION_DOWNLOAD -> startDownload(
+                intent.getIntExtra(EXTRA_COUNT, DEFAULT_DOWNLOAD_COUNT),
+                intent.getLongExtra(EXTRA_NOVEL_ID, -1L).takeIf { it > 0 },
+            )
             ACTION_CANCEL_DOWNLOAD -> downloadJob?.cancel()
             ACTION_BUFFER_SETTING -> {
                 val status = _state.value.status
@@ -245,9 +296,19 @@ class ReaderService : Service() {
             }
             ACTION_STOP -> stopAll()
             ACTION_SET_VOICE -> {
-                speechRate = intent.getFloatExtra(EXTRA_RATE, speechRate)
+                val rate = intent.getFloatExtra(EXTRA_RATE, speechRate)
                 pitch = intent.getFloatExtra(EXTRA_PITCH, pitch)
+                val id = novelId
+                if (intent.getBooleanExtra(EXTRA_FOR_NOVEL, false) && id != null) {
+                    novelRow = novelRow?.copy(rate = rate)
+                    scope.launch { library.setRate(id, rate) }
+                } else if (intent.hasExtra(EXTRA_RATE)) {
+                    globalRate = rate
+                }
+                speechRate = effectiveRate()
                 applyVoiceSettings()
+                publishSpeed()
+                publishNovelSettings()
             }
             null -> {
                 EventLog.log("Service restarted by the system")
@@ -286,8 +347,10 @@ class ReaderService : Service() {
     }
 
     /** Junk lines are dropped before chunking, so the text view and the voice see the same chunks. */
-    private fun chunksOf(chapter: Chapter): List<String> =
-        TextChunker.chunk(TextNormalizer.clean(chapter.paragraphs), chunkSize())
+    private fun chunksOf(chapter: Chapter): List<String> {
+        val paragraphs = if (novelRow?.skipAuthorNotes == true) TextNormalizer.dropAuthorNotes(chapter.paragraphs) else chapter.paragraphs
+        return TextChunker.chunk(TextNormalizer.clean(paragraphs), chunkSize())
+    }
 
     /** What is actually spoken for a chunk: user rules first, then the built-in rewrites. */
     private fun speechText(chunk: String): String =
@@ -308,15 +371,17 @@ class ReaderService : Service() {
 
     private fun systemSpeaker(settings: VoiceSettings) =
         SystemSpeaker(this, settings.systemEngine, settings.systemVoice, audioAttributes, speakerListener)
+            .also { it.setVolume(sleepFader.volume) }
 
     private fun buildSpeaker(settings: VoiceSettings): Speaker {
         val online = onlineSource(settings) ?: return systemSpeaker(settings)
         return OnlineSpeaker(this, audioCache, online.first, online.second, speakerListener)
+            .also { it.setVolume(sleepFader.volume) }
     }
 
     /** Returns a ready speaker for the saved settings, or reports the failure and returns null. */
     private suspend fun ensureSpeaker(): Speaker? {
-        val settings = store.voiceSettings.first()
+        val settings = withOverrides(store.voiceSettings.first())
         speaker?.let { current -> if (usingFallback || settings == speakerSettings) return current }
         releaseSpeaker()
         val created = buildSpeaker(settings)
@@ -364,6 +429,7 @@ class ReaderService : Service() {
         speaker = system
         speakerSettings = settings
         setState { copy(engineNote = getString(R.string.voice_fallback_note, reason ?: "")) }
+        scope.launch { loadMeasuredSpeed() }
         scope.launch {
             if (system.prepare() != Speaker.PrepareResult.OK) {
                 releaseSpeaker()
@@ -415,6 +481,7 @@ class ReaderService : Service() {
         lastRecoveredAt = SystemClock.elapsedRealtime()
         EventLog.log("Voice: back to online voice at chunk $index")
         setState { copy(engineNote = null) }
+        scope.launch { loadMeasuredSpeed() }
         startBuffer()
         return true
     }
@@ -471,15 +538,21 @@ class ReaderService : Service() {
         refreshNotification()
         loadJob = scope.launch {
             EventLog.log("Start $url at chunk $startIndex")
-            speechRate = store.speechRate.first()
+            globalRate = store.speechRate.first()
             pitch = store.pitch.first()
-            rules = ReplaceRules.compile(ruleRepository.rules.first())
+            allRules = ruleRepository.rules.first()
+            onNovelRow(requestedNovelId?.let { library.findById(it) })
             ensureSpeaker() ?: return@launch
+            loadMeasuredSpeed()
             try {
                 val loaded = loadChapter(url)
                 if (novelId == null) {
                     val count = chunksOf(loaded).size
-                    novelId = library.findOrCreate(loaded, startIndex, count).id
+                    val created = library.findOrCreate(loaded, startIndex, count)
+                    novelId = created.id
+                    onNovelRow(created)
+                    // A novel found again by its link may have its own voice.
+                    ensureSpeaker() ?: return@launch
                 }
                 beginChapter(loaded, startIndex)
             } catch (e: CancellationException) {
@@ -525,6 +598,7 @@ class ReaderService : Service() {
             copy(
                 status = PlaybackStatus.PLAYING, novelId = this@ReaderService.novelId, url = next.url, title = next.title,
                 chunkIndex = index, chunkCount = this@ReaderService.chunks.size, chunks = this@ReaderService.chunks, message = null,
+                chunkProgress = 0f, progressAt = SystemClock.elapsedRealtime(),
             )
         }
         updateMetadata(next)
@@ -536,7 +610,7 @@ class ReaderService : Service() {
         if (chunks.isEmpty()) {
             // A title page or an image-only chapter: nothing to say, so move on instead of sitting silent.
             emptyChapters++
-            if (emptyChapters > MAX_EMPTY_CHAPTERS) fail(getString(R.string.error_empty_chapters)) else advanceChapter()
+            if (emptyChapters > MAX_EMPTY_CHAPTERS) fail(getString(R.string.error_empty_chapters)) else advanceChapter(natural = false)
             return
         }
         emptyChapters = 0
@@ -565,9 +639,12 @@ class ReaderService : Service() {
             return
         }
         acquireWakeLock()
+        maybeSleepAtNight()
         s.applyVoice(speechRate, pitch)
         val resumed = pausedInPlace && s.resume()
         pausedInPlace = false
+        // Progress stood still while paused; restart the clock the screen uses to move the highlight on.
+        setState { copy(progressAt = SystemClock.elapsedRealtime()) }
         if (!resumed) {
             s.stop()
             queuedUpTo = index - 1
@@ -610,6 +687,7 @@ class ReaderService : Service() {
     }
 
     private fun markPaused() {
+        chunkStartedAt = 0L
         releaseWakeLock()
         setState { copy(status = PlaybackStatus.PAUSED, message = null) }
         updateSession(PlaybackStateCompat.STATE_PAUSED)
@@ -644,7 +722,7 @@ class ReaderService : Service() {
 
     private fun applyVoiceSettings() {
         scope.launch {
-            store.setSpeechRate(speechRate)
+            store.setSpeechRate(globalRate)
             store.setPitch(pitch)
         }
         val s = speaker ?: return
@@ -685,7 +763,8 @@ class ReaderService : Service() {
             }
             else -> return
         }
-        setState { copy(chunkIndex = index) }
+        chunkStartedAt = 0L
+        setState { copy(chunkIndex = index, chunkProgress = 0f, progressAt = SystemClock.elapsedRealtime()) }
         saveProgress()
         refreshNotification()
     }
@@ -693,6 +772,7 @@ class ReaderService : Service() {
     private fun onChunkDone(seq: Int, n: Int) {
         if (seq != chapterSeq || _state.value.status != PlaybackStatus.PLAYING || n < index) return
         consecutiveErrors = 0
+        measureSpeed(n)
         advanceTo(n + 1)
     }
 
@@ -732,7 +812,7 @@ class ReaderService : Service() {
             advanceChapter()
             return
         }
-        setState { copy(chunkIndex = index) }
+        setState { copy(chunkIndex = index, chunkProgress = 0f, progressAt = SystemClock.elapsedRealtime()) }
         saveProgress()
         refreshNotification()
         acquireWakeLock()
@@ -743,7 +823,8 @@ class ReaderService : Service() {
         enqueueAhead()
     }
 
-    private fun advanceChapter() {
+    /** [natural] is false for a skip by hand or past an empty chapter, which does not count for the sleep timer. */
+    private fun advanceChapter(natural: Boolean = true) {
         val current = chapter ?: return
         val pending = prefetch
         startRecoveryProbe(immediate = true)
@@ -751,11 +832,15 @@ class ReaderService : Service() {
             finish(getString(R.string.finished_no_next))
             return
         }
-        if (sleepAfterChapter) {
-            sleepAfterChapter = false
-            pauseRequested = true
-            setState { copy(sleepAfterChapter = false) }
+        if (natural && sleepChaptersLeft > 0) {
+            sleepChaptersLeft--
+            if (sleepChaptersLeft == 0) {
+                pauseRequested = true
+                sleepFader.stop()
+            }
+            setState { copy(sleepChapters = sleepChaptersLeft) }
         }
+        if (natural && !pauseRequested) maybeSleepAtNight()
         chapterSeq++
         setState { copy(status = PlaybackStatus.LOADING, message = getString(R.string.status_loading_next)) }
         updateSession(PlaybackStateCompat.STATE_BUFFERING)
@@ -782,7 +867,7 @@ class ReaderService : Service() {
         speaker?.stop()
         pausedInPlace = false
         pauseRequested = _state.value.status == PlaybackStatus.PAUSED
-        advanceChapter()
+        advanceChapter(natural = false)
     }
 
     /** Starts the chapter before this one, keeping the paused state; toasts when there is none. */
@@ -901,6 +986,90 @@ class ReaderService : Service() {
         val position = index
         val count = chunks.size
         scope.launch { library.updateProgress(id, current.url, current.title, position, count) }
+        if (_state.value.status == PlaybackStatus.PLAYING) countListening(playing = true)
+    }
+
+    // ---- The novel's own settings and listening time ----------------------------------------
+
+    /** Applies the novel's own speed, voice and rules as they change, and when another novel starts. */
+    private fun onNovelRow(row: Novel?) {
+        val old = novelRow
+        novelRow = row
+        val sameNovel = old?.id == row?.id
+        if (!sameNovel) compileRules()
+        if (!sameNovel || old?.rate != row?.rate) {
+            val rate = effectiveRate()
+            if (rate != speechRate) {
+                speechRate = rate
+                speaker?.let { applyVoiceSettings() }
+                publishSpeed()
+            }
+        }
+        if (sameNovel && old?.voice != row?.voice && speaker != null) reloadVoice()
+        publishNovelSettings()
+    }
+
+    private fun publishNovelSettings() {
+        setState { copy(speechRate = this@ReaderService.speechRate, ownRate = novelRow?.rate != null, voiceOverride = novelRow?.voice) }
+    }
+
+    private fun effectiveRate(): Float = novelRow?.rate ?: globalRate
+
+    private fun compileRules() {
+        rules = ReplaceRules.compile(allRules.applyingTo(novelId))
+    }
+
+    /** The voice settings with the novel's own online voice; the phone's voice has no per-novel choice. */
+    private fun withOverrides(settings: VoiceSettings, row: Novel? = novelRow): VoiceSettings {
+        val voice = row?.voice ?: return settings
+        return if (settings.engine == VoiceEngine.SYSTEM) settings else settings.copy(onlineVoice = voice)
+    }
+
+    /** Adds up time spent playing, per novel, for "Tổng thời gian nghe". */
+    private fun countListening(playing: Boolean) {
+        val now = SystemClock.elapsedRealtime()
+        val started = listenStartedAt
+        val id = listenNovelId
+        if (started > 0L && id != null) {
+            val ms = now - started
+            if (ms in 1..MAX_LISTEN_SPAN_MS) listenScope.launch { runCatching { library.addListened(id, ms) } }
+        }
+        listenStartedAt = if (playing) now else 0L
+        listenNovelId = if (playing) novelId else null
+    }
+
+    // ---- Reading speed ----------------------------------------------------------------------
+
+    /** Which voice is really speaking, since the phone's voice may be standing in for the online one. */
+    private fun voiceKey(): String {
+        val s = speakerSettings ?: return "default"
+        return if (usingFallback || s.engine == VoiceEngine.SYSTEM) "system:${s.systemVoice ?: "default"}" else "${s.engine.name.lowercase()}:${s.onlineVoice}"
+    }
+
+    private suspend fun loadMeasuredSpeed() {
+        measuredSpeed = store.voiceSpeed(voiceKey()) ?: 0f
+        publishSpeed()
+    }
+
+    private fun publishSpeed() {
+        val perSecond = (measuredSpeed.takeIf { it > 0f } ?: DEFAULT_CHARS_PER_SECOND) * speechRate
+        setState { copy(charsPerSecond = perSecond) }
+    }
+
+    /** Folds a chunk played straight through, without pause or seek, into the voice's measured speed. */
+    private fun measureSpeed(n: Int) {
+        val started = chunkStartedAt
+        chunkStartedAt = 0L
+        if (started == 0L || chunkStartedFor != n || n !in chunks.indices) return
+        val seconds = (SystemClock.elapsedRealtime() - started) / 1000f
+        if (seconds < MIN_MEASURE_SECONDS) return
+        val atNormalRate = chunks[n].length / seconds / speechRate
+        if (atNormalRate !in 3f..60f) return
+        measuredSpeed = if (measuredSpeed <= 0f) atNormalRate else measuredSpeed * 0.7f + atNormalRate * 0.3f
+        val key = voiceKey()
+        val value = measuredSpeed
+        scope.launch { store.setVoiceSpeed(key, value) }
+        publishSpeed()
     }
 
     // ---- Buffering ahead ------------------------------------------------------------------
@@ -928,7 +1097,7 @@ class ReaderService : Service() {
         val rest = chunks.drop(index + 1)
         val nextText = prefetch
         bufferJob = scope.launch {
-            val source = onlineSource(store.voiceSettings.first()) ?: return@launch
+            val source = onlineSource(withOverrides(store.voiceSettings.first())) ?: return@launch
             val ahead = bufferChapterCount()
             if (usingFallback || ahead == 0) return@launch
             // Let the chunk being spoken get its audio first.
@@ -971,18 +1140,21 @@ class ReaderService : Service() {
     // ---- Offline download -----------------------------------------------------------------
 
     /** Saves the next [count] chapters, starting with the current one, plus their audio for online voices. */
-    private fun startDownload(count: Int) {
+    private fun startDownload(count: Int, requestedNovelId: Long? = null) {
         if (downloadJob?.isActive == true) return
         downloadJob = scope.launch {
             var done = 0
             try {
-                val startUrl = chapter?.url
+                // Another novel than the one open here starts from where it was left.
+                val other = requestedNovelId?.takeIf { it != novelId || chapter == null }?.let { library.findById(it) }
+                val startUrl = other?.currentUrl
+                    ?: chapter?.url
                     ?: (novelId?.let { library.findById(it) } ?: library.mostRecent())?.currentUrl
                 if (startUrl == null) {
                     setState { copy(download = null, downloadMessage = getString(R.string.download_nothing)) }
                     return@launch
                 }
-                val online = onlineSource(store.voiceSettings.first())
+                val online = onlineSource(withOverrides(store.voiceSettings.first(), other ?: novelRow))
                 var url: String? = startUrl
                 while (url != null && done < count) {
                     setState { copy(download = DownloadProgress(done, count), downloadMessage = null) }
@@ -1020,34 +1192,93 @@ class ReaderService : Service() {
 
     // ---- Sleep timer ----------------------------------------------------------------------
 
-    /** minutes > 0 pauses after that long, [SLEEP_END_OF_CHAPTER] pauses at the chapter end, 0 turns it off. */
-    private fun setSleep(minutes: Int) {
+    /** Pauses after [chapters] chapter ends, or else after [minutes]; both 0 turns the timer off. */
+    private fun setSleep(minutes: Int, chapters: Int) {
         mainHandler.removeCallbacks(sleepRunnable)
-        sleepAfterChapter = false
+        sleepChaptersLeft = 0
         when {
-            minutes == SLEEP_END_OF_CHAPTER -> {
-                sleepAfterChapter = true
-                setState { copy(sleepDeadline = null, sleepAfterChapter = true) }
+            chapters > 0 -> {
+                sleepChaptersLeft = chapters
+                setState { copy(sleepDeadline = null, sleepTotalMs = 0, sleepChapters = chapters) }
             }
             minutes > 0 -> {
                 val delay = minutes * 60_000L
                 mainHandler.postDelayed(sleepRunnable, delay)
-                setState { copy(sleepDeadline = SystemClock.elapsedRealtime() + delay, sleepAfterChapter = false) }
+                setState { copy(sleepDeadline = SystemClock.elapsedRealtime() + delay, sleepTotalMs = delay, sleepChapters = 0) }
             }
-            else -> setState { copy(sleepDeadline = null, sleepAfterChapter = false) }
+            else -> setState { copy(sleepDeadline = null, sleepTotalMs = 0, sleepChapters = 0) }
         }
+        sleepFader.stop()
+        if (chapters > 0 || minutes > 0) sleepFader.start()
         refreshNotification()
     }
 
     private fun onSleepTimer() {
         setState { copy(sleepDeadline = null) }
         pause()
+        sleepFader.stop()
     }
 
     private fun clearSleep() {
         mainHandler.removeCallbacks(sleepRunnable)
-        sleepAfterChapter = false
-        setState { copy(sleepDeadline = null, sleepAfterChapter = false) }
+        sleepChaptersLeft = 0
+        sleepFader.stop()
+        setState { copy(sleepDeadline = null, sleepTotalMs = 0, sleepChapters = 0) }
+    }
+
+    /**
+     * Listening left before the timer stops playback. For "after this chapter" it is estimated from the
+     * text still to read and the measured speed, so the fade may land a little early or late.
+     */
+    private fun sleepSecondsLeft(): Float? {
+        val s = _state.value
+        if (s.status != PlaybackStatus.PLAYING) return null
+        val now = SystemClock.elapsedRealtime()
+        s.sleepDeadline?.let { return (it - now) / 1000f }
+        if (sleepChaptersLeft != 1 || s.charsPerSecond <= 0f) return null
+        val current = chunks.getOrNull(index)?.length?.coerceAtLeast(1) ?: return null
+        val moved = if (s.progressAt > 0L) (now - s.progressAt) / 1000f * s.charsPerSecond / current else 0f
+        val heard = (s.chunkProgress + moved).coerceIn(0f, 1f)
+        val rest = chunks.drop(index + 1).sumOf { it.length }
+        return (rest + current * (1f - heard)) / s.charsPerSecond
+    }
+
+    private fun extendSleepByShake() {
+        EventLog.log("Sleep timer extended by a shake")
+        buzz()
+        setSleep(SleepFader.SHAKE_EXTEND_MINUTES, 0)
+    }
+
+    /** A short buzz, so a shake in the dark is felt to have worked. */
+    private fun buzz() {
+        runCatching {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                getSystemService(VibratorManager::class.java).defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(Vibrator::class.java)
+            }
+            vibrator.vibrate(VibrationEffect.createOneShot(BUZZ_MS, VibrationEffect.DEFAULT_AMPLITUDE))
+        }
+    }
+
+    /**
+     * Late at night, playback that starts (or reaches a new chapter) without a timer gets "after this chapter",
+     * once per night, so cancelling it or listening on afterwards is not overridden.
+     */
+    private fun maybeSleepAtNight() {
+        if (!autoSleepAtNight || sleepChaptersLeft > 0 || _state.value.sleepDeadline != null) return
+        val now = LocalDateTime.now()
+        if (now.hour < AUTO_SLEEP_HOUR && now.hour >= AUTO_SLEEP_UNTIL_HOUR) return
+        // A night runs from the evening into the small hours, so it is named after the evening's date.
+        val night = now.minusHours(AUTO_SLEEP_UNTIL_HOUR.toLong()).toLocalDate().toString()
+        scope.launch {
+            if (store.autoSleepNight() == night) return@launch
+            store.setAutoSleepNight(night)
+            if (sleepChaptersLeft > 0 || _state.value.sleepDeadline != null) return@launch
+            EventLog.log("Sleep timer set for the night: after this chapter")
+            setSleep(0, 1)
+        }
     }
 
     // ---- Audio focus and wake lock --------------------------------------------------------
@@ -1185,7 +1416,8 @@ class ReaderService : Service() {
             PlaybackStatus.ERROR, PlaybackStatus.FINISHED -> s.message ?: progress
         }
         val sleepNote = when {
-            s.sleepAfterChapter -> getString(R.string.sleep_after_chapter_short)
+            s.sleepChapters == 1 -> getString(R.string.sleep_after_chapter_short)
+            s.sleepChapters > 1 -> getString(R.string.sleep_after_chapters_short, s.sleepChapters)
             s.sleepDeadline != null -> getString(R.string.sleep_remaining_short, ((s.sleepDeadline - SystemClock.elapsedRealtime()) / 60_000L + 1).coerceAtLeast(1))
             else -> null
         }
@@ -1204,9 +1436,9 @@ class ReaderService : Service() {
             .setOnlyAlertOnce(true)
             .setOngoing(active)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .addAction(NotificationCompat.Action(R.drawable.ic_fast_rewind, getString(R.string.action_prev_chunk), servicePendingIntent(ACTION_PREV_CHUNK, 5)))
+            .addAction(NotificationCompat.Action(R.drawable.ic_replay, getString(R.string.action_prev_chunk), servicePendingIntent(ACTION_PREV_CHUNK, 5)))
             .addAction(toggle)
-            .addAction(NotificationCompat.Action(R.drawable.ic_fast_forward, getString(R.string.action_next_chunk), servicePendingIntent(ACTION_NEXT_CHUNK, 6)))
+            .addAction(NotificationCompat.Action(R.drawable.ic_forward, getString(R.string.action_next_chunk), servicePendingIntent(ACTION_NEXT_CHUNK, 6)))
             .addAction(NotificationCompat.Action(R.drawable.ic_skip_next, getString(R.string.action_next), servicePendingIntent(ACTION_NEXT, 3)))
             .addAction(NotificationCompat.Action(R.drawable.ic_stop, getString(R.string.action_stop), servicePendingIntent(ACTION_STOP, 4)))
             .setStyle(
@@ -1224,7 +1456,12 @@ class ReaderService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-    private inline fun setState(block: ReaderState.() -> ReaderState) = _state.update(block)
+    private inline fun setState(block: ReaderState.() -> ReaderState) {
+        val before = _state.value.status
+        _state.update(block)
+        val after = _state.value.status
+        if (before != after) countListening(playing = after == PlaybackStatus.PLAYING)
+    }
 
     companion object {
         const val ACTION_START = "com.tung.readloud.action.START"
@@ -1249,10 +1486,21 @@ class ReaderService : Service() {
         const val EXTRA_INDEX = "index"
         const val EXTRA_NOVEL_ID = "novel_id"
         const val EXTRA_RATE = "rate"
+
+        /** With [ACTION_SET_VOICE]: the speed is the novel's own, not the voice settings'. */
+        const val EXTRA_FOR_NOVEL = "for_novel"
+        private const val MAX_LISTEN_SPAN_MS = 6 * 60 * 60 * 1000L
+
+        /** Listening time is saved even as the service is torn down, when its own scope is already cancelled. */
+        private val listenScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         const val EXTRA_PITCH = "pitch"
         const val EXTRA_SLEEP_MINUTES = "sleep_minutes"
         const val EXTRA_COUNT = "count"
         const val SLEEP_END_OF_CHAPTER = -1
+        private const val AUTO_SLEEP_HOUR = 23
+        private const val AUTO_SLEEP_UNTIL_HOUR = 5
+        private const val BUZZ_MS = 60L
+        const val EXTRA_SLEEP_CHAPTERS = "sleep_chapters"
 
         private const val RECOVERY_INTERVAL_MS = 60_000L
         private const val MAX_RECOVERY_INTERVAL_MS = 8 * 60_000L
@@ -1268,6 +1516,7 @@ class ReaderService : Service() {
         private const val CHUNK_TARGET_CHARS = 1000
         private const val MAX_CONSECUTIVE_ERRORS = 3
         private const val MAX_EMPTY_CHAPTERS = 5
+        private const val MIN_MEASURE_SECONDS = 5f
         private const val BUFFER_START_DELAY_MS = 3_000L
         private const val MIN_FREE_BYTES_FOR_BUFFER = 300L * 1024 * 1024
         private const val DEFAULT_DOWNLOAD_COUNT = 10

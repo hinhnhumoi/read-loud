@@ -1,9 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_text_size"
+        android:title="@string/reader_text_size"
+        app:actionLayout="@layout/action_text_size"
+        app:showAsAction="always" />
     <item
         android:id="@+id/action_toc"
-        android:title="@string/toc_title" />
+        android:icon="@drawable/ic_list"
+        android:title="@string/toc_title"
+        app:iconTint="@color/rl_text"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_bookmark"
+        android:title="@string/reader_bookmark_current"
+        app:showAsAction="never" />
     <item
         android:id="@+id/action_rules"
-        android:title="@string/rules_title" />
+        android:title="@string/rules_title"
+        app:showAsAction="never" />
 </menu>

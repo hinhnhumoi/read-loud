@@ -4,4 +4,11 @@
     <dimen name="dialog_padding">24dp</dimen>
     <dimen name="reader_scroll_offset">96dp</dimen>
     <dimen name="touch_target">48dp</dimen>
+    <dimen name="screen_margin">20dp</dimen>
+    <dimen name="bottom_nav_height">80dp</dimen>
+    <dimen name="mini_player_height">64dp</dimen>
+    <!-- Mini player plus the gap above the tab bar plus the tab bar. -->
+    <dimen name="sheet_peek">152dp</dimen>
+    <!-- Room left under scrolling tab content so the mini player never covers the last row. -->
+    <dimen name="mini_player_inset">88dp</dimen>
 </resources>

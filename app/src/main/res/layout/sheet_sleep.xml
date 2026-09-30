@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="@dimen/screen_margin"
+    android:paddingBottom="24dp">
+
+    <View
+        android:layout_width="36dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_sheet_handle" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:layout_width="88dp"
+            android:layout_height="88dp">
+
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/ring"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:max="1000"
+                app:indicatorColor="@color/rl_accent"
+                app:indicatorSize="88dp"
+                app:trackColor="@color/rl_track"
+                app:trackCornerRadius="3dp"
+                app:trackThickness="6dp" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/ringTime"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="@style/TextAppearance.RL.Title"
+                    android:textSize="19sp"
+                    tools:text="18:34" />
+
+                <TextView
+                    android:id="@+id/ringLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/sleep_left"
+                    android:textAppearance="@style/TextAppearance.RL.Small" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="20dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/sleep_title"
+                android:textAppearance="@style/TextAppearance.RL.Display"
+                android:textSize="26sp" />
+
+            <TextView
+                android:id="@+id/sleepStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textAppearance="@style/TextAppearance.RL.Body"
+                android:textColor="@color/rl_muted"
+                tools:text="Dừng lúc ~23:05" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <GridLayout
+        android:id="@+id/options"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:columnCount="3"
+        android:useDefaultMargins="false" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/fadeRow"
+        style="@style/RL.SettingRow">
+
+        <LinearLayout style="@style/RL.SettingRow.Texts">
+
+            <TextView
+                style="@style/RL.SettingRow.Title"
+                android:text="@string/sleep_fade" />
+
+            <TextView
+                android:id="@+id/fadeHint"
+                style="@style/RL.SettingRow.Sub"
+                android:text="@string/sleep_fade_hint" />
+        </LinearLayout>
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/fadeSwitch"
+            style="@style/Widget.RL.Switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp" />
+    </LinearLayout>
+
+    <View style="@style/RL.Divider" />
+
+    <LinearLayout
+        android:id="@+id/shakeRow"
+        style="@style/RL.SettingRow">
+
+        <LinearLayout style="@style/RL.SettingRow.Texts">
+
+            <TextView
+                style="@style/RL.SettingRow.Title"
+                android:text="@string/sleep_shake" />
+
+            <TextView
+                android:id="@+id/shakeHint"
+                style="@style/RL.SettingRow.Sub"
+                android:text="@string/sleep_shake_hint" />
+        </LinearLayout>
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/shakeSwitch"
+            style="@style/Widget.RL.Switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp" />
+    </LinearLayout>
+
+    <View style="@style/RL.Divider" />
+
+    <LinearLayout
+        android:id="@+id/nightRow"
+        style="@style/RL.SettingRow">
+
+        <LinearLayout style="@style/RL.SettingRow.Texts">
+
+            <TextView
+                style="@style/RL.SettingRow.Title"
+                android:text="@string/sleep_night" />
+
+            <TextView
+                android:id="@+id/nightHint"
+                style="@style/RL.SettingRow.Sub"
+                android:text="@string/sleep_night_hint" />
+        </LinearLayout>
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/nightSwitch"
+            style="@style/Widget.RL.Switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp" />
+    </LinearLayout>
+    </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnOff"
+        style="@style/Widget.RL.Button.Outlined"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="@string/sleep_off" />
+</LinearLayout>

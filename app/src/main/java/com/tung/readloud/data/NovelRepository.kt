@@ -11,11 +11,29 @@ class NovelRepository(context: Context) {
     private val db = AppDatabase.get(context)
     private val dao = db.novels()
     private val tocDao = db.toc()
+    private val bookmarkDao = db.bookmarks()
+    private val ruleDao = db.rules()
     private val legacy = ProgressStore(context)
 
     val novels: Flow<List<Novel>> = dao.observeAll()
 
     suspend fun findById(id: Long): Novel? = dao.findById(id)
+
+    fun observe(id: Long): Flow<Novel?> = dao.observeById(id)
+
+    suspend fun followed(): List<Novel> = dao.followed()
+
+    suspend fun anyFollowed(): Boolean = dao.followedCount() > 0
+
+    suspend fun addListened(id: Long, ms: Long) = dao.addListened(id, ms)
+
+    suspend fun setFollow(id: Long, on: Boolean) = dao.setFollow(id, on)
+
+    suspend fun setVoice(id: Long, voice: String?) = dao.setVoice(id, voice)
+
+    suspend fun setRate(id: Long, rate: Float?) = dao.setRate(id, rate)
+
+    suspend fun setSkipAuthorNotes(id: Long, on: Boolean) = dao.setSkipAuthorNotes(id, on)
 
     suspend fun findByKey(key: String): Novel? = dao.findByKey(key)
 
@@ -55,6 +73,8 @@ class NovelRepository(context: Context) {
     suspend fun delete(id: Long) {
         db.withTransaction {
             tocDao.clear(id)
+            bookmarkDao.clear(id)
+            ruleDao.clearFor(id)
             dao.delete(id)
         }
     }
@@ -63,14 +83,20 @@ class NovelRepository(context: Context) {
 
     suspend fun tocEntries(id: Long): List<TocEntry> = tocDao.entries(id)
 
-    /** Replaces the stored chapter list and remembers where it came from. */
+    /**
+     * Replaces the stored chapter list and remembers where it came from. The first list saved counts as
+     * seen; chapters that appear in later lists are new until listened past.
+     */
     suspend fun saveToc(id: Long, tocUrl: String, entries: List<TocParser.Entry>) {
         db.withTransaction {
             tocDao.clear(id)
             tocDao.insertAll(entries.mapIndexed { i, e -> TocEntry(id, i, e.title, e.url) })
             dao.setTocUrl(id, tocUrl)
+            dao.setSeenTocCountIfMissing(id, entries.size)
         }
     }
+
+    suspend fun tocCount(id: Long): Int = tocDao.count(id)
 
     /** Carries the single saved position from the first version into the library once. */
     suspend fun migrateLegacy() {

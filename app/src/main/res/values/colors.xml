@@ -1,13 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#005DB7</color>
+    <color name="ic_launcher_background">#15130F</color>
 
-    <color name="md_primary">#005DB7</color>
-    <color name="md_on_primary">#FFFFFF</color>
-    <color name="md_primary_container">#D6E3FF</color>
-    <color name="md_on_primary_container">#001B3E</color>
-    <color name="md_secondary">#565E71</color>
-    <color name="md_on_secondary">#FFFFFF</color>
-    <color name="md_secondary_container">#DAE2F9</color>
-    <color name="md_on_secondary_container">#131C2B</color>
+    <!-- Warm dark palette: the app is mostly used at night. -->
+    <color name="rl_bg">#15130F</color>
+    <color name="rl_surface">#1F1C17</color>
+    <color name="rl_surface_2">#2A261F</color>
+    <color name="rl_surface_3">#332E26</color>
+    <color name="rl_nav">#1A1813</color>
+    <color name="rl_line">#2E2A22</color>
+    <color name="rl_track">#3A3429</color>
+    <color name="rl_text">#F4EDE0</color>
+    <color name="rl_muted">#B8AE9C</color>
+    <color name="rl_faint">#938978</color>
+    <color name="rl_heard">#6F675A</color>
+    <color name="rl_upcoming">#CFC5B3</color>
+    <color name="rl_accent">#EBA84E</color>
+    <color name="rl_on_accent">#1C1307</color>
+    <color name="rl_accent_tint">#24EBA84E</color>
+    <color name="rl_accent_line">#80EBA84E</color>
+    <color name="rl_offline">#86C9BD</color>
+    <color name="rl_warn">#E58A6E</color>
+    <color name="rl_scrim">#99000000</color>
 </resources>

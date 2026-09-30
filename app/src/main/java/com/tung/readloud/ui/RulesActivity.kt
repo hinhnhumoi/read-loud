@@ -1,5 +1,7 @@
 package com.tung.readloud.ui
 
+import android.content.Intent
+import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.ViewGroup
@@ -19,11 +21,12 @@ import com.tung.readloud.databinding.ActivityRulesBinding
 import com.tung.readloud.databinding.ItemRuleBinding
 import kotlinx.coroutines.launch
 
-/** The list of "read X as Y" rules; changes apply to chunks queued after the edit. */
+/** The list of "read X as Y" rules, general or for one novel; changes apply to chunks queued after the edit. */
 class RulesActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityRulesBinding
     private val repo by lazy { RuleRepository(this) }
+    private val novelId by lazy { intent.getLongExtra(EXTRA_NOVEL_ID, -1L).takeIf { it > 0 } }
     private val adapter = RuleAdapter(
         onClick = { RuleDialog.show(this, existing = it) },
         onToggle = { rule, enabled -> lifecycleScope.launch { repo.save(rule.copy(enabled = enabled)) } },
@@ -36,10 +39,14 @@ class RulesActivity : AppCompatActivity() {
         binding.toolbar.setNavigationOnClickListener { finish() }
         binding.list.layoutManager = LinearLayoutManager(this)
         binding.list.adapter = adapter
-        binding.btnAdd.setOnClickListener { RuleDialog.show(this) }
+        binding.btnAdd.setOnClickListener { RuleDialog.show(this, novelId = novelId) }
+        intent.getStringExtra(EXTRA_NOVEL_NAME)?.let { name ->
+            binding.toolbar.title = getString(R.string.own_rules_title, name)
+            binding.toolbar.subtitle = getString(R.string.own_rules_hint)
+        }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                repo.rules.collect { rules ->
+                repo.rulesFor(novelId).collect { rules ->
                     adapter.submitList(rules)
                     binding.empty.isVisible = rules.isEmpty()
                 }
@@ -78,5 +85,17 @@ class RulesActivity : AppCompatActivity() {
             override fun areItemsTheSame(a: ReplaceRule, b: ReplaceRule) = a.id == b.id
             override fun areContentsTheSame(a: ReplaceRule, b: ReplaceRule) = a == b
         }
+    }
+
+    companion object {
+        private const val EXTRA_NOVEL_ID = "novel_id"
+        private const val EXTRA_NOVEL_NAME = "novel_name"
+
+        /** The rules for [novelId] only; without one, the general rules. */
+        fun intent(context: Context, novelId: Long? = null, novelName: String? = null): Intent =
+            Intent(context, RulesActivity::class.java).apply {
+                if (novelId != null) putExtra(EXTRA_NOVEL_ID, novelId)
+                if (novelName != null) putExtra(EXTRA_NOVEL_NAME, novelName)
+            }
     }
 }

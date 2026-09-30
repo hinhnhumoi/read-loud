@@ -13,3 +13,6 @@ captures/
 # Local tool output and sample audio
 .github/modernize/
 /giong-thu-*.mp3
+
+# Design handover from Claude Design, kept locally
+/re-design/

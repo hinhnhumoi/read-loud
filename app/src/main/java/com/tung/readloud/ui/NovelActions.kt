@@ -11,22 +11,23 @@ import com.tung.readloud.book.BookStore
 import com.tung.readloud.book.BookUrl
 import com.tung.readloud.data.Novel
 import com.tung.readloud.data.NovelRepository
+import com.tung.readloud.follow.NewChapterWorker
 import com.tung.readloud.tts.ReaderService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** The per-novel menu shared by the home screen and the library: TOC, rename, delete. */
+/** The per-novel menu shared by the home screen and the library: details, rename, delete. */
 object NovelActions {
 
     fun showMenu(activity: AppCompatActivity, novel: Novel, anchor: View) {
         val menu = PopupMenu(activity, anchor)
-        menu.menu.add(0, TOC, 0, R.string.toc_title)
+        menu.menu.add(0, DETAILS, 0, R.string.detail_title)
         menu.menu.add(0, RENAME, 1, R.string.novel_rename)
         menu.menu.add(0, DELETE, 2, R.string.novel_delete)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
-                TOC -> activity.startActivity(TocActivity.intent(activity, novel.id))
+                DETAILS -> activity.startActivity(NovelDetailActivity.intent(activity, novel.id))
                 RENAME -> rename(activity, novel)
                 DELETE -> confirmDelete(activity, novel)
             }
@@ -35,7 +36,7 @@ object NovelActions {
         menu.show()
     }
 
-    private fun rename(activity: AppCompatActivity, novel: Novel) {
+    fun rename(activity: AppCompatActivity, novel: Novel) {
         val input = EditText(activity).apply {
             setText(novel.name)
             setSelectAllOnFocus(true)
@@ -52,7 +53,7 @@ object NovelActions {
             .show()
     }
 
-    private fun confirmDelete(activity: AppCompatActivity, novel: Novel) {
+    fun confirmDelete(activity: AppCompatActivity, novel: Novel, onDeleted: () -> Unit = {}) {
         MaterialAlertDialogBuilder(activity)
             .setTitle(R.string.novel_delete)
             .setMessage(activity.getString(R.string.novel_delete_confirm, novel.name))
@@ -61,13 +62,15 @@ object NovelActions {
                 activity.lifecycleScope.launch {
                     NovelRepository(activity).delete(novel.id)
                     BookUrl.bookId(novel.currentUrl)?.let { id -> withContext(Dispatchers.IO) { BookStore(activity).delete(id) } }
+                    NewChapterWorker.sync(activity)
+                    onDeleted()
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
-    private const val TOC = 1
+    private const val DETAILS = 1
     private const val RENAME = 2
     private const val DELETE = 3
 }
