@@ -74,6 +74,7 @@ class NovelRepository(context: Context) {
         db.withTransaction {
             tocDao.clear(id)
             bookmarkDao.clear(id)
+            db.savedChapters().clear(id)
             ruleDao.clearFor(id)
             dao.delete(id)
         }

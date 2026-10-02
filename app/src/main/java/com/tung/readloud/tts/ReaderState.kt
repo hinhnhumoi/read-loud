@@ -2,13 +2,6 @@ package com.tung.readloud.tts
 
 enum class PlaybackStatus { IDLE, LOADING, PLAYING, PAUSED, ERROR, FINISHED }
 
-data class DownloadProgress(
-    val chaptersDone: Int,
-    val chaptersTotal: Int,
-    val chunksDone: Int = 0,
-    val chunksTotal: Int = 0,
-)
-
 /** Vietnamese neural voices at 1.0x say about this many characters a second, until the app has measured. */
 const val DEFAULT_CHARS_PER_SECOND = 14f
 
@@ -35,13 +28,11 @@ data class ReaderState(
     val charsPerSecond: Float = DEFAULT_CHARS_PER_SECOND,
     /** Set when the online voice failed and the phone's voice took over. */
     val engineNote: String? = null,
-    val download: DownloadProgress? = null,
     /** Chapters after the current one whose text and audio are already prepared. */
     val bufferedChapters: Int = 0,
     /** A page stuck behind a bot check that the user has to pass by hand, and where to resume after. */
     val verifyUrl: String? = null,
     val verifyResumeIndex: Int = 0,
-    val downloadMessage: String? = null,
     /** The speed in use: the novel's own when it has one, else the voice settings'. */
     val speechRate: Float = 1f,
     /** The novel being read has its own speed, so speed changes from the player are saved to it. */

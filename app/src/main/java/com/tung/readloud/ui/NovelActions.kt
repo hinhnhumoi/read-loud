@@ -1,5 +1,6 @@
 package com.tung.readloud.ui
 
+import com.tung.readloud.offline.OfflineSaver
 import android.view.View
 import android.widget.EditText
 import android.widget.PopupMenu
@@ -60,6 +61,7 @@ object NovelActions {
             .setPositiveButton(R.string.novel_delete) { _, _ ->
                 if (ReaderService.state.value.novelId == novel.id) ReaderService.send(activity, ReaderService.ACTION_STOP)
                 activity.lifecycleScope.launch {
+                    OfflineSaver.removeNovel(activity, novel.id)
                     NovelRepository(activity).delete(novel.id)
                     BookUrl.bookId(novel.currentUrl)?.let { id -> withContext(Dispatchers.IO) { BookStore(activity).delete(id) } }
                     NewChapterWorker.sync(activity)

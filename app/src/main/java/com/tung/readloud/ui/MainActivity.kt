@@ -1,5 +1,7 @@
 package com.tung.readloud.ui
 
+import com.tung.readloud.data.ProgressStore
+import com.tung.readloud.offline.OfflineSaver
 import kotlinx.coroutines.flow.first
 import com.tung.readloud.follow.NewChapterWorker
 import android.content.Context
@@ -83,7 +85,11 @@ class MainActivity : AppCompatActivity() {
         observe()
         requestNotificationPermission()
         handleIntent(intent)
-        lifecycleScope.launch { NewChapterWorker.sync(this@MainActivity) }
+        lifecycleScope.launch {
+            NewChapterWorker.sync(this@MainActivity)
+            OfflineSaver.syncNight(this@MainActivity, ProgressStore(this@MainActivity).nightSaveCount.first())
+            OfflineSaver.expire(this@MainActivity)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

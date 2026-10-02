@@ -70,6 +70,20 @@ class ProgressStore(context: Context) {
         store.edit { it[KEY_SLEEP_AUTO_NIGHT] = night }
     }
 
+    /** Chapters to save each night, while charging on Wi-Fi, for the novels heard lately; 0 turns it off. */
+    val nightSaveCount: Flow<Int> = store.data.map { it[KEY_NIGHT_SAVE] ?: DEFAULT_NIGHT_SAVE }.distinctUntilChanged()
+
+    /** Days a saved chapter may go unused before it is removed; 0 keeps saved chapters until removed by hand. */
+    val savedKeepDays: Flow<Int> = store.data.map { it[KEY_KEEP_DAYS] ?: DEFAULT_KEEP_DAYS }.distinctUntilChanged()
+
+    suspend fun setSavedKeepDays(days: Int) {
+        store.edit { it[KEY_KEEP_DAYS] = days }
+    }
+
+    suspend fun setNightSaveCount(count: Int) {
+        store.edit { it[KEY_NIGHT_SAVE] = count }
+    }
+
     suspend fun setBufferChapters(count: Int) {
         store.edit { it[KEY_BUFFER] = count }
     }
@@ -132,6 +146,10 @@ class ProgressStore(context: Context) {
         const val DEFAULT_READER_SIZE = 17f
         private val KEY_READER_SIZE = floatPreferencesKey("reader_text_size")
         private val KEY_BUFFER = intPreferencesKey("buffer_chapters")
+        private val KEY_NIGHT_SAVE = intPreferencesKey("night_save_count")
+        const val DEFAULT_NIGHT_SAVE = 10
+        private val KEY_KEEP_DAYS = intPreferencesKey("saved_keep_days")
+        const val DEFAULT_KEEP_DAYS = 15
         private val KEY_SLEEP_FADE = booleanPreferencesKey("sleep_fade")
         private val KEY_SLEEP_SHAKE = booleanPreferencesKey("sleep_shake")
         private val KEY_SLEEP_AUTO = booleanPreferencesKey("sleep_auto_night")

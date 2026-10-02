@@ -1,5 +1,7 @@
 package com.tung.readloud.ui
 
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.tung.readloud.offline.OfflineSaver
 import android.content.Intent
 import android.media.MediaPlayer
 import android.os.Bundle
@@ -96,11 +98,22 @@ class SettingsFragment : Fragment() {
             settings = store.voiceSettings.first()
             bindSettings()
             bindBuffer(store.bufferChapters.first())
+            bindNight(store.nightSaveCount.first())
+            bindKeep(store.savedKeepDays.first())
             loaded = true
             loadSystemTts(settings.systemEngine)
         }
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    OfflineSaver.summary(requireContext()).collect { (count, bytes) ->
+                        _binding?.savedSummary?.text = if (count == 0) {
+                            getString(R.string.saved_none)
+                        } else {
+                            getString(R.string.saved_summary, count, android.text.format.Formatter.formatShortFileSize(requireContext(), bytes))
+                        }
+                    }
+                }
                 rules.rulesFor(null).collect { list ->
                     val enabled = list.filter { it.enabled }
                     val sample = enabled.take(2).joinToString(", ") { "${it.pattern} → ${it.replacement.ifBlank { "∅" }}" }
@@ -298,6 +311,39 @@ class SettingsFragment : Fragment() {
                     ReaderService.send(requireContext(), ReaderService.ACTION_BUFFER_SETTING)
                 }
             }
+        }
+    }
+
+    private fun bindKeep(current: Int) {
+        val values = listOf(7, 15, 30, 0)
+        binding.keepSegment.setOptions(values.map { if (it == 0) getString(R.string.keep_never) else getString(R.string.keep_days, it) }, soft = true)
+        binding.keepSegment.select(values.indexOf(current).coerceAtLeast(0))
+        binding.keepSegment.onSelected = { i ->
+            lifecycleScope.launch {
+                store.setSavedKeepDays(values[i])
+                OfflineSaver.expire(requireContext())
+            }
+        }
+    }
+
+    private fun bindNight(current: Int) {
+        val values = listOf(0, 5, 10, 20)
+        binding.nightSegment.setOptions(listOf(getString(R.string.night_off), "5", "10", "20"), soft = true)
+        binding.nightSegment.select(values.indexOf(current).coerceAtLeast(0))
+        binding.nightSegment.onSelected = { i ->
+            val count = values[i]
+            lifecycleScope.launch {
+                store.setNightSaveCount(count)
+                OfflineSaver.syncNight(requireContext(), count)
+            }
+        }
+        binding.rowSaved.setOnClickListener {
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.saved_clear_title)
+                .setMessage(R.string.saved_clear_message)
+                .setPositiveButton(R.string.saved_clear) { _, _ -> lifecycleScope.launch { OfflineSaver.clearAll(requireContext()) } }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
         }
     }
 

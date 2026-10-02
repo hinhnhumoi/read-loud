@@ -26,7 +26,6 @@ import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.speech.tts.TextToSpeech
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
@@ -53,15 +52,11 @@ import com.tung.readloud.data.applyingTo
 import com.tung.readloud.fetch.ChallengeRequiredException
 import com.tung.readloud.fetch.PageFetcher
 import com.tung.readloud.model.Chapter
+import com.tung.readloud.offline.OfflineSaver
 import com.tung.readloud.parse.ChapterParser
 import com.tung.readloud.parse.NextChapterFinder
-import com.tung.readloud.parse.TextChunker
-import com.tung.readloud.parse.TextNormalizer
 import com.tung.readloud.parse.TocParser
 import com.tung.readloud.tts.speech.AudioCache
-import com.tung.readloud.tts.speech.AzureSynthesizer
-import com.tung.readloud.tts.speech.EdgeSynthesizer
-import com.tung.readloud.tts.speech.Http
 import com.tung.readloud.tts.speech.OnlineSpeaker
 import com.tung.readloud.tts.speech.Speaker
 import com.tung.readloud.tts.speech.Synthesizer
@@ -113,6 +108,10 @@ class ReaderService : Service() {
     private var novelRow: Novel? = null
     private var globalRate = ProgressStore.DEFAULT_RATE
     private var listenStartedAt = 0L
+
+    /** A chunk to start part way into, at [startChars], after "Nghe từ đây" on a sentence; -1 for none. */
+    private var startChunk = -1
+    private var startChars = 0
     private var listenNovelId: Long? = null
     private val chapterCache by lazy { ChapterCache(this) }
     private val audioCache by lazy { AudioCache(this, scope) }
@@ -145,7 +144,6 @@ class ReaderService : Service() {
     private var chapterSeq = 0
     private var prefetch: Deferred<Chapter>? = null
     private var loadJob: Job? = null
-    private var downloadJob: Job? = null
     private var bufferJob: Job? = null
     private var pauseRequested = false
     private var pausedByFocusLoss = false
@@ -199,7 +197,9 @@ class ReaderService : Service() {
                 chunkStartedAt = SystemClock.elapsedRealtime()
                 chunkStartedFor = n
             }
-            setState { copy(chunkProgress = fraction.coerceIn(0f, 1f), progressAt = SystemClock.elapsedRealtime()) }
+            // A chunk started part way reports progress through the part read; the screen wants the whole chunk.
+            val base = startFraction(n)
+            setState { copy(chunkProgress = (base + (1f - base) * fraction).coerceIn(0f, 1f), progressAt = SystemClock.elapsedRealtime()) }
         }
 
         override fun onStall(waiting: Boolean) {
@@ -278,18 +278,13 @@ class ReaderService : Service() {
             ACTION_PREV_CHAPTER -> skipToPrevious()
             ACTION_PREV_CHUNK -> seekChunk(currentIndex() - 1)
             ACTION_NEXT_CHUNK -> seekChunk(currentIndex() + 1)
-            ACTION_SEEK_CHUNK -> seekChunk(intent.getIntExtra(EXTRA_INDEX, currentIndex()))
+            ACTION_SEEK_CHUNK -> seekChunk(intent.getIntExtra(EXTRA_INDEX, currentIndex()), intent.getIntExtra(EXTRA_OFFSET, 0))
             ACTION_SET_SLEEP -> {
                 val minutes = intent.getIntExtra(EXTRA_SLEEP_MINUTES, 0)
                 val chapters = intent.getIntExtra(EXTRA_SLEEP_CHAPTERS, if (minutes == SLEEP_END_OF_CHAPTER) 1 else 0)
                 setSleep(if (minutes == SLEEP_END_OF_CHAPTER) 0 else minutes, chapters)
             }
             ACTION_RELOAD_VOICE -> reloadVoice()
-            ACTION_DOWNLOAD -> startDownload(
-                intent.getIntExtra(EXTRA_COUNT, DEFAULT_DOWNLOAD_COUNT),
-                intent.getLongExtra(EXTRA_NOVEL_ID, -1L).takeIf { it > 0 },
-            )
-            ACTION_CANCEL_DOWNLOAD -> downloadJob?.cancel()
             ACTION_BUFFER_SETTING -> {
                 val status = _state.value.status
                 if (chunks.isNotEmpty() && (status == PlaybackStatus.PLAYING || status == PlaybackStatus.PAUSED)) startBuffer()
@@ -328,7 +323,6 @@ class ReaderService : Service() {
         }
         loadJob?.cancel()
         prefetch?.cancel()
-        downloadJob?.cancel()
         mainHandler.removeCallbacks(sleepRunnable)
         releaseSpeaker()
         runCatching { unregisterReceiver(noisyReceiver) }
@@ -347,27 +341,12 @@ class ReaderService : Service() {
     }
 
     /** Junk lines are dropped before chunking, so the text view and the voice see the same chunks. */
-    private fun chunksOf(chapter: Chapter): List<String> {
-        val paragraphs = if (novelRow?.skipAuthorNotes == true) TextNormalizer.dropAuthorNotes(chapter.paragraphs) else chapter.paragraphs
-        return TextChunker.chunk(TextNormalizer.clean(paragraphs), chunkSize())
-    }
+    private fun chunksOf(chapter: Chapter): List<String> = ChapterText.chunks(chapter, novelRow?.skipAuthorNotes == true)
 
     /** What is actually spoken for a chunk: user rules first, then the built-in rewrites. */
-    private fun speechText(chunk: String): String =
-        TextNormalizer.forSpeech(ReplaceRules.apply(rules, chunk)).ifBlank { chunk }
+    private fun speechText(chunk: String): String = ChapterText.speech(chunk, rules)
 
-    private fun chunkSize(): Int =
-        minOf(CHUNK_TARGET_CHARS, TextToSpeech.getMaxSpeechInputLength() - 100).coerceAtLeast(200)
-
-    private fun onlineSource(settings: VoiceSettings): Pair<Synthesizer, String>? = when (settings.engine) {
-        VoiceEngine.SYSTEM -> null
-        VoiceEngine.EDGE -> EdgeSynthesizer(Http.client) to settings.onlineVoice
-        VoiceEngine.AZURE -> if (settings.azureKey.isBlank()) {
-            null
-        } else {
-            AzureSynthesizer(Http.client, settings.azureKey, settings.azureRegion) to settings.onlineVoice
-        }
-    }
+    private fun onlineSource(settings: VoiceSettings): Pair<Synthesizer, String>? = ChapterText.onlineSource(settings)
 
     private fun systemSpeaker(settings: VoiceSettings) =
         SystemSpeaker(this, settings.systemEngine, settings.systemVoice, audioAttributes, speakerListener)
@@ -586,6 +565,19 @@ class ReaderService : Service() {
     }
 
     private fun beginChapter(next: Chapter, startIndex: Int) {
+        startChunk = -1
+        // Playing a saved chapter keeps it from being removed as unused; while listening, old ones are cleared
+        // now and then, since the app itself may not be opened for days.
+        val playingId = novelId
+        val now = SystemClock.elapsedRealtime()
+        val expireDue = lastExpireAt == 0L || now - lastExpireAt > EXPIRE_EVERY_MS
+        if (expireDue) lastExpireAt = now
+        listenScope.launch {
+            runCatching {
+                if (playingId != null) OfflineSaver.touch(applicationContext, playingId, next.url)
+                if (expireDue) OfflineSaver.expire(applicationContext)
+            }
+        }
         speaker?.stop()
         pausedInPlace = false
         chapter = next
@@ -664,7 +656,8 @@ class ReaderService : Service() {
         val last = minOf(target, chunks.size - 1)
         while (queuedUpTo < last) {
             queuedUpTo++
-            s.enqueue("c${chapterSeq}_p$queuedUpTo", speechText(chunks[queuedUpTo]))
+            val text = chunks[queuedUpTo].let { if (queuedUpTo == startChunk) it.substring(startChars) else it }
+            s.enqueue("c${chapterSeq}_p$queuedUpTo", speechText(text))
         }
     }
 
@@ -737,7 +730,8 @@ class ReaderService : Service() {
     private fun currentIndex(): Int = if (chapter == null) _state.value.chunkIndex else index
 
     /** Jumps to a chunk in the current chapter; past the end moves to the next chapter. */
-    private fun seekChunk(target: Int) {
+    /** [offset] starts the chunk part way in, at that character, as when listening from a sentence in the text view. */
+    private fun seekChunk(target: Int, offset: Int = 0) {
         if (chunks.isEmpty()) {
             if (chapter == null) resumeLast(target.coerceAtLeast(0))
             return
@@ -747,6 +741,9 @@ class ReaderService : Service() {
             return
         }
         val clamped = target.coerceAtLeast(0)
+        val length = chunks[clamped].length
+        startChunk = if (offset in 1 until length) clamped else -1
+        startChars = if (startChunk >= 0) offset else 0
         when (_state.value.status) {
             PlaybackStatus.PLAYING -> {
                 speaker?.stop()
@@ -764,15 +761,28 @@ class ReaderService : Service() {
             else -> return
         }
         chunkStartedAt = 0L
-        setState { copy(chunkIndex = index, chunkProgress = 0f, progressAt = SystemClock.elapsedRealtime()) }
+        setState { copy(chunkIndex = index, chunkProgress = startFraction(index), progressAt = SystemClock.elapsedRealtime()) }
         saveProgress()
         refreshNotification()
+    }
+
+    /** How much of chunk [n] is skipped by starting part way into it. */
+    private fun startFraction(n: Int): Float {
+        if (n != startChunk) return 0f
+        val length = chunks.getOrNull(n)?.length?.takeIf { it > 0 } ?: return 0f
+        return startChars.toFloat() / length
     }
 
     private fun onChunkDone(seq: Int, n: Int) {
         if (seq != chapterSeq || _state.value.status != PlaybackStatus.PLAYING || n < index) return
         consecutiveErrors = 0
-        measureSpeed(n)
+        if (n == startChunk) {
+            // Only part of it was read, which would skew the speed measured for the voice.
+            chunkStartedAt = 0L
+            startChunk = -1
+        } else {
+            measureSpeed(n)
+        }
         advanceTo(n + 1)
     }
 
@@ -914,7 +924,7 @@ class ReaderService : Service() {
         setState { copy(status = PlaybackStatus.FINISHED, message = message) }
         updateSession(PlaybackStateCompat.STATE_STOPPED)
         refreshNotification()
-        if (downloadJob?.isActive != true) ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
         scope.launch { store.setPlaying(false) }
     }
 
@@ -928,7 +938,7 @@ class ReaderService : Service() {
         setState { copy(status = PlaybackStatus.ERROR, message = message, ttsNeedsData = needsData) }
         updateSession(PlaybackStateCompat.STATE_ERROR)
         refreshNotification()
-        if (downloadJob?.isActive != true) ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
         scope.launch { store.setPlaying(false) }
     }
 
@@ -955,14 +965,13 @@ class ReaderService : Service() {
         loadJob?.cancel()
         stopBuffer()
         prefetch?.cancel()
-        downloadJob?.cancel()
         speaker?.stop()
         pausedInPlace = false
         clearSleep()
         saveProgress()
         releaseWakeLock()
         abandonFocus()
-        setState { copy(status = PlaybackStatus.IDLE, message = null, download = null) }
+        setState { copy(status = PlaybackStatus.IDLE, message = null) }
         updateSession(PlaybackStateCompat.STATE_STOPPED)
         session.isActive = false
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
@@ -1020,10 +1029,7 @@ class ReaderService : Service() {
     }
 
     /** The voice settings with the novel's own online voice; the phone's voice has no per-novel choice. */
-    private fun withOverrides(settings: VoiceSettings, row: Novel? = novelRow): VoiceSettings {
-        val voice = row?.voice ?: return settings
-        return if (settings.engine == VoiceEngine.SYSTEM) settings else settings.copy(onlineVoice = voice)
-    }
+    private fun withOverrides(settings: VoiceSettings, row: Novel? = novelRow): VoiceSettings = ChapterText.withOverrides(settings, row)
 
     /** Adds up time spent playing, per novel, for "Tổng thời gian nghe". */
     private fun countListening(playing: Boolean) {
@@ -1135,59 +1141,6 @@ class ReaderService : Service() {
         bufferJob?.cancel()
         bufferJob = null
         if (_state.value.bufferedChapters != 0) setState { copy(bufferedChapters = 0) }
-    }
-
-    // ---- Offline download -----------------------------------------------------------------
-
-    /** Saves the next [count] chapters, starting with the current one, plus their audio for online voices. */
-    private fun startDownload(count: Int, requestedNovelId: Long? = null) {
-        if (downloadJob?.isActive == true) return
-        downloadJob = scope.launch {
-            var done = 0
-            try {
-                // Another novel than the one open here starts from where it was left.
-                val other = requestedNovelId?.takeIf { it != novelId || chapter == null }?.let { library.findById(it) }
-                val startUrl = other?.currentUrl
-                    ?: chapter?.url
-                    ?: (novelId?.let { library.findById(it) } ?: library.mostRecent())?.currentUrl
-                if (startUrl == null) {
-                    setState { copy(download = null, downloadMessage = getString(R.string.download_nothing)) }
-                    return@launch
-                }
-                val online = onlineSource(withOverrides(store.voiceSettings.first(), other ?: novelRow))
-                var url: String? = startUrl
-                while (url != null && done < count) {
-                    setState { copy(download = DownloadProgress(done, count), downloadMessage = null) }
-                    refreshNotification()
-                    val ch = loadChapter(url)
-                    if (online != null) {
-                        val parts = chunksOf(ch)
-                        for ((i, part) in parts.withIndex()) {
-                            for (piece in OnlineSpeaker.splitForSynthesis(speechText(part))) {
-                                audioCache.request(online.first, online.second, piece).await()
-                            }
-                            setState { copy(download = DownloadProgress(done, count, i + 1, parts.size)) }
-                        }
-                    }
-                    done++
-                    url = ch.nextUrl?.takeIf { it != ch.url }
-                }
-                setState { copy(download = null, downloadMessage = getString(R.string.download_done, done)) }
-            } catch (e: CancellationException) {
-                setState { copy(download = null, downloadMessage = getString(R.string.download_cancelled, done)) }
-                throw e
-            } catch (e: Exception) {
-                setState {
-                    copy(download = null, downloadMessage = getString(R.string.download_failed, done, e.message ?: e.javaClass.simpleName))
-                }
-            } finally {
-                refreshNotification()
-                if (_state.value.status == PlaybackStatus.IDLE) {
-                    ServiceCompat.stopForeground(this@ReaderService, ServiceCompat.STOP_FOREGROUND_REMOVE)
-                    stopSelf()
-                }
-            }
-        }
     }
 
     // ---- Sleep timer ----------------------------------------------------------------------
@@ -1409,7 +1362,7 @@ class ReaderService : Service() {
         }
         val progress = if (s.chunkCount > 0) getString(R.string.progress_text, s.chunkIndex + 1, s.chunkCount) else ""
         val text = when (s.status) {
-            PlaybackStatus.IDLE -> if (s.download != null) null else getString(R.string.status_idle)
+            PlaybackStatus.IDLE -> getString(R.string.status_idle)
             PlaybackStatus.LOADING -> s.message ?: getString(R.string.status_loading)
             PlaybackStatus.PLAYING -> getString(R.string.status_reading, s.chunkIndex + 1, s.chunkCount)
             PlaybackStatus.PAUSED -> getString(R.string.status_paused, s.chunkIndex + 1, s.chunkCount)
@@ -1421,7 +1374,6 @@ class ReaderService : Service() {
             s.sleepDeadline != null -> getString(R.string.sleep_remaining_short, ((s.sleepDeadline - SystemClock.elapsedRealtime()) / 60_000L + 1).coerceAtLeast(1))
             else -> null
         }
-        val downloadNote = s.download?.let { getString(R.string.download_note_short, it.chaptersDone + 1, it.chaptersTotal) }
         val openApp = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
@@ -1430,7 +1382,7 @@ class ReaderService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(s.title ?: getString(R.string.app_name))
-            .setContentText(listOfNotNull(text, sleepNote, downloadNote).joinToString(" · "))
+            .setContentText(listOfNotNull(text, sleepNote).joinToString(" · "))
             .setContentIntent(openApp)
             .setDeleteIntent(servicePendingIntent(ACTION_STOP, 4))
             .setOnlyAlertOnce(true)
@@ -1478,18 +1430,21 @@ class ReaderService : Service() {
         const val ACTION_SEEK_CHUNK = "com.tung.readloud.action.SEEK_CHUNK"
         const val ACTION_SET_SLEEP = "com.tung.readloud.action.SET_SLEEP"
         const val ACTION_RELOAD_VOICE = "com.tung.readloud.action.RELOAD_VOICE"
-        const val ACTION_DOWNLOAD = "com.tung.readloud.action.DOWNLOAD"
-        const val ACTION_CANCEL_DOWNLOAD = "com.tung.readloud.action.CANCEL_DOWNLOAD"
         const val ACTION_STOP = "com.tung.readloud.action.STOP"
         const val ACTION_SET_VOICE = "com.tung.readloud.action.SET_VOICE"
         const val EXTRA_URL = "url"
         const val EXTRA_INDEX = "index"
+
+        /** With [ACTION_SEEK_CHUNK]: the character in the chunk to start from. */
+        const val EXTRA_OFFSET = "offset"
         const val EXTRA_NOVEL_ID = "novel_id"
         const val EXTRA_RATE = "rate"
 
         /** With [ACTION_SET_VOICE]: the speed is the novel's own, not the voice settings'. */
         const val EXTRA_FOR_NOVEL = "for_novel"
         private const val MAX_LISTEN_SPAN_MS = 6 * 60 * 60 * 1000L
+        private const val EXPIRE_EVERY_MS = 6 * 60 * 60 * 1000L
+        private var lastExpireAt = 0L
 
         /** Listening time is saved even as the service is torn down, when its own scope is already cancelled. */
         private val listenScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -1513,13 +1468,11 @@ class ReaderService : Service() {
         private const val CHANNEL_ID = "reader"
         private const val ALERT_CHANNEL_ID = "alerts"
         private const val NOTIFICATION_ID = 1
-        private const val CHUNK_TARGET_CHARS = 1000
         private const val MAX_CONSECUTIVE_ERRORS = 3
         private const val MAX_EMPTY_CHAPTERS = 5
         private const val MIN_MEASURE_SECONDS = 5f
         private const val BUFFER_START_DELAY_MS = 3_000L
         private const val MIN_FREE_BYTES_FOR_BUFFER = 300L * 1024 * 1024
-        private const val DEFAULT_DOWNLOAD_COUNT = 10
         private const val WAKE_LOCK_TIMEOUT_MS = 6L * 60 * 60 * 1000
         private val utteranceIdPattern = Regex("c(\\d+)_p(\\d+)")
 

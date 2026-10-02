@@ -1,5 +1,6 @@
 package com.tung.readloud.ui
 
+import com.tung.readloud.offline.OfflineSaver
 import android.content.Intent
 import android.os.SystemClock
 import android.text.SpannableString
@@ -35,6 +36,9 @@ class PlayerUi(
     private var rate = ProgressStore.DEFAULT_RATE
     private var voice: VoiceSettings = VoiceSettings()
     private var globalRate = ProgressStore.DEFAULT_RATE
+
+    /** Chapters still waiting in the offline queue. */
+    private var savingLeft = 0
     private var seeking = false
     private val accent = ContextCompat.getColor(activity, R.color.rl_accent)
 
@@ -75,6 +79,12 @@ class PlayerUi(
             store.speechRate.collect {
                 globalRate = it
                 np?.let(::showSpeedAndVoice) ?: run { player.quickSpeedValue.text = activity.getString(R.string.player_speed, format(it)) }
+            }
+        }
+        activity.lifecycleScope.launch {
+            OfflineSaver.progress(activity).collect {
+                savingLeft = it?.remaining ?: 0
+                np?.let(::bindQuick)
             }
         }
         activity.lifecycleScope.launch {
@@ -204,13 +214,13 @@ class PlayerUi(
         })
         val sleeping = deadline != null || s.sleepChapters > 0
         player.quickSleepIcon.setColorFilter(ContextCompat.getColor(activity, if (sleeping) R.color.rl_accent else R.color.rl_text))
-        val download = s.download
-        player.quickDownloadLabel.text = when {
-            download != null -> activity.getString(R.string.download_note_short, download.chaptersDone + 1, download.chaptersTotal)
+        val saving = savingLeft
+        player.quickDownloadLabel.setTextIfChanged(when {
+            saving > 0 -> activity.getString(R.string.download_note_short, saving)
             s.bufferedChapters > 0 -> activity.getString(R.string.player_buffered, s.bufferedChapters)
             else -> activity.getString(R.string.action_download)
-        }
-        val ready = download != null || s.bufferedChapters > 0
+        })
+        val ready = saving > 0 || s.bufferedChapters > 0
         player.quickDownloadIcon.setColorFilter(ContextCompat.getColor(activity, if (ready) R.color.rl_offline else R.color.rl_text))
     }
 

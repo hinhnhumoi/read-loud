@@ -11,13 +11,13 @@ import com.tung.readloud.R
 import com.tung.readloud.databinding.ItemChunkBinding
 
 /**
- * Shows the chapter's TTS chunks: heard ones faded, the one being spoken on an amber tint. Tap a chunk
- * to jump there; select words to add a pronunciation rule, bookmark them, or listen from that chunk.
+ * Shows the chapter's TTS chunks: heard ones faded, the one being spoken on an amber tint. A long press
+ * selects a word and offers to listen from its sentence, bookmark it, or add a pronunciation rule; a
+ * plain tap does nothing, so scrolling through the text never moves the voice.
  */
 class ChunkAdapter(
-    private val onClick: (Int) -> Unit,
     private val onRuleRequest: (selected: String, chunk: String) -> Unit,
-    private val onListenFrom: (Int) -> Unit,
+    private val onListenFrom: (position: Int, offset: Int) -> Unit,
     private val onBookmark: (position: Int, selected: String) -> Unit,
 ) : RecyclerView.Adapter<ChunkAdapter.Holder>() {
 
@@ -71,12 +71,14 @@ class ChunkAdapter(
                 else -> R.color.rl_upcoming
             }
             binding.text.setTextColor(ContextCompat.getColor(ctx, color))
-            binding.text.setOnClickListener { onClick(position) }
             binding.text.customSelectionActionModeCallback = object : ActionMode.Callback {
                 override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
-                    menu.add(Menu.NONE, MENU_RULE, 0, R.string.rules_from_selection)
-                    menu.add(Menu.NONE, MENU_LISTEN, 1, R.string.reader_listen_here)
-                    menu.add(Menu.NONE, MENU_BOOKMARK, 2, R.string.reader_bookmark)
+                    // Listening comes first; the system's own items follow, minus the ones of no use here.
+                    menu.add(Menu.NONE, MENU_LISTEN, 0, R.string.reader_listen_here)
+                    menu.add(Menu.NONE, MENU_BOOKMARK, 1, R.string.reader_bookmark)
+                    menu.add(Menu.NONE, MENU_RULE, 2, R.string.rules_from_selection)
+                    menu.removeItem(android.R.id.selectAll)
+                    menu.removeItem(android.R.id.shareText)
                     return true
                 }
 
@@ -89,7 +91,10 @@ class ChunkAdapter(
                             val end = maxOf(binding.text.selectionStart, binding.text.selectionEnd).coerceAtMost(text.length)
                             if (end > start) onRuleRequest(text.substring(start, end), text)
                         }
-                        MENU_LISTEN -> onListenFrom(position)
+                        MENU_LISTEN -> {
+                            val at = minOf(binding.text.selectionStart, binding.text.selectionEnd).coerceAtLeast(0)
+                            onListenFrom(position, Sentences.startOf(text, at))
+                        }
                         MENU_BOOKMARK -> {
                             val start = minOf(binding.text.selectionStart, binding.text.selectionEnd).coerceAtLeast(0)
                             val end = maxOf(binding.text.selectionStart, binding.text.selectionEnd).coerceAtMost(text.length)

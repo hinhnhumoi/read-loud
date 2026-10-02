@@ -17,6 +17,9 @@ object Sentences {
         return Triple(all.getOrNull(i - 1)?.second, all[i], all.getOrNull(i + 1)?.second)
     }
 
+    /** Where the sentence holding [offset] begins, so listening can start at its first word. */
+    fun startOf(text: String, offset: Int): Int = split(text).lastOrNull { it.first <= offset }?.first ?: 0
+
     fun last(text: String): String? = split(text).lastOrNull()?.second
 
     fun first(text: String): String? = split(text).firstOrNull()?.second

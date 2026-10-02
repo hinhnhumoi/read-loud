@@ -28,9 +28,8 @@ class ReaderActivity : AppCompatActivity() {
     private val store by lazy { ProgressStore(this) }
     private val novels by lazy { NovelRepository(this) }
     private val adapter = ChunkAdapter(
-        onClick = ::seek,
         onRuleRequest = { selected, chunk -> RuleDialog.show(this, prefill = selected, sample = chunk) },
-        onListenFrom = ::seek,
+        onListenFrom = ::listenFrom,
         onBookmark = { position, selected -> bookmark(position, selected) },
     )
     private var lastScrolledTo = -1
@@ -96,8 +95,14 @@ class ReaderActivity : AppCompatActivity() {
         }
     }
 
-    private fun seek(position: Int) {
-        ReaderService.send(this, ReaderService.ACTION_SEEK_CHUNK) { putExtra(ReaderService.EXTRA_INDEX, position) }
+    /** Moves the voice to the sentence picked in the text, and sets it reading if it was not. */
+    private fun listenFrom(position: Int, offset: Int) {
+        ReaderService.send(this, ReaderService.ACTION_SEEK_CHUNK) {
+            putExtra(ReaderService.EXTRA_INDEX, position)
+            putExtra(ReaderService.EXTRA_OFFSET, offset)
+        }
+        val status = ReaderService.state.value.status
+        if (status != PlaybackStatus.PLAYING && status != PlaybackStatus.LOADING) ReaderService.send(this, ReaderService.ACTION_PLAY)
     }
 
     private fun chooseTextSize(anchor: android.view.View) {

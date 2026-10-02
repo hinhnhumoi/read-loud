@@ -23,10 +23,12 @@ import java.util.concurrent.atomic.AtomicInteger
  * cancelled, so audio for text the listener skipped past does not hold up what plays next.
  *
  * Background requests (buffering chapters ahead) use at most one slot and only while no playback request
- * is waiting, so they never delay the voice that is speaking.
+ * is waiting, so they never delay the voice that is speaking. Audio saved for offline listening lives in
+ * [OfflineAudio]'s folder, is found first, and is never trimmed.
  */
 class AudioCache(context: Context, private val scope: CoroutineScope) {
-    private val dir = File(context.filesDir, "tts-audio").apply { mkdirs() }
+    private val dir = File(context.filesDir, DIR).apply { mkdirs() }
+    private val savedDir = File(context.filesDir, OfflineAudio.DIR)
     private val inflight = HashMap<String, Entry>()
     private val limiter = Semaphore(MAX_PARALLEL)
     private val backgroundLimiter = Semaphore(1)
@@ -36,13 +38,16 @@ class AudioCache(context: Context, private val scope: CoroutineScope) {
 
     private class Entry(val job: Deferred<File>, var users: Int, val urgent: AtomicBoolean)
 
-    fun cachedFile(voice: String, text: String): File? =
-        File(dir, key(voice, text) + ".mp3").takeIf { it.length() > 0 }
+    fun cachedFile(voice: String, text: String): File? {
+        val key = key(voice, text)
+        return File(savedDir, "$key.mp3").takeIf { it.length() > 0 } ?: File(dir, "$key.mp3").takeIf { it.length() > 0 }
+    }
 
     /** Each call counts as one user of the synthesis until it is [release]d or finishes. */
     fun request(synthesizer: Synthesizer, voice: String, text: String, background: Boolean = false): Deferred<File> =
         synchronized(inflight) {
             val key = key(voice, text)
+            File(savedDir, "$key.mp3").takeIf { it.length() > 0 }?.let { return CompletableDeferred(it) }
             val file = File(dir, "$key.mp3")
             if (file.length() > 0) {
                 file.setLastModified(System.currentTimeMillis())
@@ -128,12 +133,14 @@ class AudioCache(context: Context, private val scope: CoroutineScope) {
         }
     }
 
-    private fun key(voice: String, text: String) = Hashing.sha1("$voice\n$text")
+    companion object {
+        const val DIR = "tts-audio"
 
-    private companion object {
-        const val MAX_PARALLEL = 2
-        const val SLOW_SLOT_MS = 3_000L
-        const val YIELD_POLL_MS = 300L
-        const val MAX_BYTES = 800L * 1024 * 1024
+        fun key(voice: String, text: String) = Hashing.sha1("$voice\n$text")
+
+        private const val MAX_PARALLEL = 2
+        private const val SLOW_SLOT_MS = 3_000L
+        private const val YIELD_POLL_MS = 300L
+        private const val MAX_BYTES = 800L * 1024 * 1024
     }
 }

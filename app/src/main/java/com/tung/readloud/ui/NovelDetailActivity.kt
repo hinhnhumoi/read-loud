@@ -1,5 +1,7 @@
 package com.tung.readloud.ui
 
+import com.tung.readloud.offline.OfflineSaver
+import com.tung.readloud.data.SavedChapter
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -28,7 +30,6 @@ import com.tung.readloud.book.BookStore
 import com.tung.readloud.book.BookUrl
 import com.tung.readloud.data.Bookmark
 import com.tung.readloud.data.BookmarkRepository
-import com.tung.readloud.data.ChapterCache
 import com.tung.readloud.data.Novel
 import com.tung.readloud.data.NovelRepository
 import com.tung.readloud.data.ProgressStore
@@ -72,7 +73,6 @@ class NovelDetailActivity : AppCompatActivity() {
     private val rules by lazy { RuleRepository(this) }
     private val store by lazy { ProgressStore(this) }
     private val fetcher by lazy { PageFetcher(this) }
-    private val chapterCache by lazy { ChapterCache(this) }
 
     private var novelId = -1L
     private var novel: Novel? = null
@@ -85,7 +85,7 @@ class NovelDetailActivity : AppCompatActivity() {
     private var scrolledToCurrent = false
     private var markCount = 0
 
-    private val chapterAdapter = ChapterAdapter { entry -> listen(entry.url, 0) }
+    private val chapterAdapter = ChapterAdapter(onClick = { entry -> listen(entry.url, 0) }, onSave = ::onSaveTapped)
     private val markAdapter = BookmarkAdapter(onOpen = { listen(it.chapterUrl, it.chunkIndex) }, onMenu = ::showMarkMenu)
 
     /** Arguments of the last [load], repeated once the user has passed a bot check. */
@@ -135,6 +135,11 @@ class NovelDetailActivity : AppCompatActivity() {
                         novel = n
                         playing = p
                         render()
+                    }
+                }
+                launch {
+                    OfflineSaver.observe(this@NovelDetailActivity, novelId).collect { rows ->
+                        chapterAdapter.saved = rows.associateBy { TocParser.normalize(it.url) }
                     }
                 }
                 launch {
@@ -209,7 +214,7 @@ class NovelDetailActivity : AppCompatActivity() {
         binding.followSwitch.isChecked = n.followNew
         binding.followHint.setText(if (n.tocUrl == null) R.string.follow_needs_toc else R.string.follow_hint)
 
-        chapterAdapter.update(index, if (book) null else n.seenTocCount, if (book) emptySet() else chapterAdapter.offline)
+        chapterAdapter.update(index, if (book) null else n.seenTocCount)
         if (!scrolledToCurrent && index != null && chapterAdapter.itemCount > 0 && binding.jump.text.isNullOrBlank()) {
             scrolledToCurrent = true
             (binding.tocList.layoutManager as LinearLayoutManager)
@@ -378,12 +383,7 @@ class NovelDetailActivity : AppCompatActivity() {
         entries = list
         binding.tocStatusGroup.isVisible = false
         binding.jump.isVisible = list.isNotEmpty()
-        val saved = if (isBook) {
-            emptySet()
-        } else {
-            withContext(Dispatchers.IO) { list.filter { chapterCache.contains(it.url) }.map { TocParser.normalize(it.url) }.toSet() }
-        }
-        chapterAdapter.submit(list, saved)
+        chapterAdapter.submit(list)
         chapterAdapter.filter(binding.jump.text?.toString().orEmpty())
         scrolledToCurrent = false
         render()
@@ -422,6 +422,30 @@ class NovelDetailActivity : AppCompatActivity() {
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    /** Saves a chapter, or offers to remove its saved copy, or to try again after a failure. */
+    private fun onSaveTapped(index: Int, entry: TocParser.Entry, saved: SavedChapter?) {
+        when (saved?.state) {
+            null -> lifecycleScope.launch {
+                OfflineSaver.save(this@NovelDetailActivity, novelId, listOf(Triple(entry.url, entry.title, index)))
+            }
+            SavedChapter.FAILED -> MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.chapter_failed_title)
+                .setMessage(saved.error)
+                .setPositiveButton(R.string.chapter_retry) { _, _ ->
+                    lifecycleScope.launch { OfflineSaver.save(this@NovelDetailActivity, novelId, listOf(Triple(saved.url, entry.title, index))) }
+                }
+                .setNeutralButton(R.string.chapter_remove) { _, _ -> lifecycleScope.launch { OfflineSaver.remove(this@NovelDetailActivity, novelId, saved.url) } }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+            else -> MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.chapter_remove_title)
+                .setMessage(entry.title)
+                .setPositiveButton(R.string.chapter_remove) { _, _ -> lifecycleScope.launch { OfflineSaver.remove(this@NovelDetailActivity, novelId, saved.url) } }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
     }
 
     // ---- Đánh dấu -------------------------------------------------------------------------
@@ -504,27 +528,34 @@ class NovelDetailActivity : AppCompatActivity() {
 
     // ---- Lists ----------------------------------------------------------------------------
 
-    /** The chapter list, with what is being heard, what was heard, what is new and what is saved offline. */
-    private class ChapterAdapter(private val onClick: (TocParser.Entry) -> Unit) : RecyclerView.Adapter<ChapterAdapter.Holder>() {
+    /** The chapter list, with what is being heard, what was heard, what is new, and a button to save each one. */
+    private class ChapterAdapter(
+        private val onClick: (TocParser.Entry) -> Unit,
+        private val onSave: (Int, TocParser.Entry, SavedChapter?) -> Unit,
+    ) : RecyclerView.Adapter<ChapterAdapter.Holder>() {
         private var all: List<TocParser.Entry> = emptyList()
         private var rows: List<Int> = emptyList()
         private var current: Int? = null
         private var newFrom: Int? = null
-        var offline: Set<String> = emptySet()
-            private set
 
-        fun submit(entries: List<TocParser.Entry>, saved: Set<String>) {
+        /** Saved and queued chapters by normalized link. */
+        var saved: Map<String, SavedChapter> = emptyMap()
+            set(value) {
+                if (field == value) return
+                field = value
+                notifyDataSetChanged()
+            }
+
+        fun submit(entries: List<TocParser.Entry>) {
             all = entries
-            offline = saved
             rows = entries.indices.toList()
             notifyDataSetChanged()
         }
 
-        fun update(currentIndex: Int?, seenCount: Int?, saved: Set<String>) {
-            if (currentIndex == current && seenCount == newFrom && saved == offline) return
+        fun update(currentIndex: Int?, seenCount: Int?) {
+            if (currentIndex == current && seenCount == newFrom) return
             current = currentIndex
             newFrom = seenCount
-            offline = saved
             notifyDataSetChanged()
         }
 
@@ -561,7 +592,6 @@ class NovelDetailActivity : AppCompatActivity() {
                     cur != null && index == cur -> R.string.toc_tag_current to R.color.rl_accent
                     cur != null && index < cur -> R.string.toc_tag_heard to R.color.rl_heard
                     newFrom != null && index >= newFrom!! -> R.string.toc_tag_new to R.color.rl_accent
-                    TocParser.normalize(entry.url) in offline -> R.string.toc_tag_offline to R.color.rl_offline
                     else -> null to R.color.rl_text
                 }
                 binding.tag.isVisible = tag != null
@@ -574,6 +604,33 @@ class NovelDetailActivity : AppCompatActivity() {
                 }
                 binding.title.setTextColor(ContextCompat.getColor(ctx, titleColor))
                 binding.row.setOnClickListener { onClick(entry) }
+                bindSave(index, entry, ctx)
+            }
+
+            private fun bindSave(index: Int, entry: TocParser.Entry, ctx: Context) {
+                val row = saved[TocParser.normalize(entry.url)]
+                val cur = current
+                // Chapters already heard have nothing to save, unless a copy is still around to remove.
+                binding.saveFrame.isVisible = row != null || cur == null || index >= cur
+                val state = row?.state
+                val busy = state == SavedChapter.QUEUED || state == SavedChapter.SAVING
+                binding.saveProgress.isVisible = busy
+                binding.saveProgress.isIndeterminate = state == SavedChapter.QUEUED || (state == SavedChapter.SAVING && row.piecesTotal == 0)
+                if (state == SavedChapter.SAVING && row.piecesTotal > 0) {
+                    binding.saveProgress.setProgressCompat(row.piecesDone * 100 / row.piecesTotal, false)
+                }
+                binding.btnSave.icon = if (busy) null else ContextCompat.getDrawable(ctx, if (state == SavedChapter.DONE) R.drawable.ic_check else R.drawable.ic_download)
+                binding.btnSave.iconTint = android.content.res.ColorStateList.valueOf(
+                    ContextCompat.getColor(
+                        ctx,
+                        when (state) {
+                            SavedChapter.DONE -> R.color.rl_offline
+                            SavedChapter.FAILED -> R.color.rl_warn
+                            else -> R.color.rl_faint
+                        },
+                    ),
+                )
+                binding.btnSave.setOnClickListener { onSave(index, entry, row) }
             }
         }
     }

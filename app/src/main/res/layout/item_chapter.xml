@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -43,6 +44,35 @@
             android:textAppearance="@style/TextAppearance.RL.Small"
             android:textStyle="bold"
             tools:text="đang nghe" />
+
+        <!-- Save for offline: download, waiting, progress, saved, or failed. -->
+        <FrameLayout
+            android:id="@+id/saveFrame"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="4dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSave"
+                style="@style/Widget.RL.IconButton.Muted"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:contentDescription="@string/chapter_save"
+                app:icon="@drawable/ic_download"
+                app:iconSize="20dp" />
+
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/saveProgress"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:max="100"
+                android:visibility="gone"
+                app:indicatorColor="@color/rl_offline"
+                app:indicatorSize="22dp"
+                app:trackColor="@color/rl_track"
+                app:trackThickness="2dp" />
+        </FrameLayout>
     </LinearLayout>
 
     <View

@@ -7,12 +7,16 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [Novel::class, TocEntry::class, ReplaceRule::class, Bookmark::class], version = 3, exportSchema = false)
+@Database(entities = [Novel::class, TocEntry::class, ReplaceRule::class, Bookmark::class, SavedChapter::class],
+    version = 5,
+    exportSchema = false,
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun novels(): NovelDao
     abstract fun toc(): TocDao
     abstract fun rules(): ReplaceRuleDao
     abstract fun bookmarks(): BookmarkDao
+    abstract fun savedChapters(): SavedChapterDao
 
     companion object {
         @Volatile
@@ -57,9 +61,29 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** Chapters kept for offline listening. */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `saved_chapters` (`novelId` INTEGER NOT NULL, `url` TEXT NOT NULL, " +
+                        "`title` TEXT NOT NULL, `position` INTEGER NOT NULL, `state` INTEGER NOT NULL, `voice` TEXT NOT NULL, " +
+                        "`keys` TEXT NOT NULL, `piecesDone` INTEGER NOT NULL, `piecesTotal` INTEGER NOT NULL, `bytes` INTEGER NOT NULL, " +
+                        "`attempts` INTEGER NOT NULL, `error` TEXT, `queuedAt` INTEGER NOT NULL, PRIMARY KEY(`novelId`, `url`))",
+                )
+            }
+        }
+
+        /** Saved chapters are kept until unused for a while, instead of until heard. */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `saved_chapters` ADD COLUMN `lastUsedAt` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE `saved_chapters` SET `lastUsedAt` = `queuedAt`")
+            }
+        }
+
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "readloud.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
                 .also { instance = it }
         }

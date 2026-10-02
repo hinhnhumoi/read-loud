@@ -311,6 +311,59 @@
             android:text="@string/settings_buffer_hint"
             android:textAppearance="@style/TextAppearance.RL.Meta" />
 
+        <!-- Saving for offline -->
+        <TextView
+            style="@style/RL.SectionLabel"
+            android:text="@string/night_title" />
+
+        <com.tung.readloud.ui.SegmentedControl
+            android:id="@+id/nightSegment"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/night_hint"
+            android:textAppearance="@style/TextAppearance.RL.Meta" />
+
+        <TextView
+            style="@style/RL.SectionLabel"
+            android:text="@string/keep_title" />
+
+        <com.tung.readloud.ui.SegmentedControl
+            android:id="@+id/keepSegment"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/keep_hint"
+            android:textAppearance="@style/TextAppearance.RL.Meta" />
+
+        <LinearLayout
+            android:id="@+id/rowSaved"
+            style="@style/RL.SettingRow"
+            android:layout_marginTop="8dp">
+
+            <LinearLayout style="@style/RL.SettingRow.Texts">
+
+                <TextView
+                    style="@style/RL.SettingRow.Title"
+                    android:text="@string/saved_title" />
+
+                <TextView
+                    android:id="@+id/savedSummary"
+                    style="@style/RL.SettingRow.Sub"
+                    tools:text="12 chương · 45 MB" />
+            </LinearLayout>
+        </LinearLayout>
+
         <!-- More -->
         <View
             android:layout_width="match_parent"
