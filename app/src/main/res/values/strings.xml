@@ -306,6 +306,7 @@
 
     <string name="reader_text_size">Cỡ chữ</string>
     <string name="reader_listen_here">Nghe từ đây</string>
+    <string name="reader_back_to_voice">Về chỗ đang đọc</string>
     <string name="reader_bookmark">Đánh dấu</string>
     <string name="reader_bookmark_current">Đánh dấu đoạn đang đọc</string>
 

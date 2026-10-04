@@ -1,5 +1,8 @@
 package com.tung.readloud.ui
 
+import android.text.style.ForegroundColorSpan
+import android.text.Spanned
+import android.text.SpannableString
 import android.view.ActionMode
 import android.view.LayoutInflater
 import android.view.Menu
@@ -11,13 +14,12 @@ import com.tung.readloud.R
 import com.tung.readloud.databinding.ItemChunkBinding
 
 /**
- * Shows the chapter's TTS chunks: heard ones faded, the one being spoken on an amber tint. A long press
- * selects a word and offers to listen from its sentence, bookmark it, or add a pronunciation rule; a
- * plain tap does nothing, so scrolling through the text never moves the voice.
+ * Shows the chapter's TTS chunks: heard ones faded, the one being spoken on an amber tint, and the sentence
+ * the voice would start from when the reader has scrolled away. A long press selects words to bookmark or
+ * add a pronunciation rule for; a plain tap does nothing, so scrolling through the text never moves the voice.
  */
 class ChunkAdapter(
     private val onRuleRequest: (selected: String, chunk: String) -> Unit,
-    private val onListenFrom: (position: Int, offset: Int) -> Unit,
     private val onBookmark: (position: Int, selected: String) -> Unit,
 ) : RecyclerView.Adapter<ChunkAdapter.Holder>() {
 
@@ -31,6 +33,24 @@ class ChunkAdapter(
             field = value
             notifyDataSetChanged()
         }
+
+    /** Chunk and character range of the marked sentence. */
+    private var marker: Triple<Int, Int, Int>? = null
+
+    fun setMarker(position: Int, start: Int, end: Int) {
+        val old = marker
+        val next = Triple(position, start, end)
+        if (old == next) return
+        marker = next
+        old?.let { notifyItemChanged(it.first) }
+        notifyItemChanged(position)
+    }
+
+    fun clearMarker() {
+        val old = marker ?: return
+        marker = null
+        notifyItemChanged(old.first)
+    }
 
     fun submit(newChunks: List<String>, newCurrent: Int) {
         val changed = newChunks != chunks
@@ -62,7 +82,15 @@ class ChunkAdapter(
     inner class Holder(private val binding: ItemChunkBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(text: String, position: Int) {
             val ctx = binding.root.context
-            binding.text.text = text
+            val mark = marker?.takeIf { it.first == position && it.third <= text.length && it.second < it.third }
+            binding.text.text = if (mark == null) {
+                text
+            } else {
+                SpannableString(text).apply {
+                    // Amber, like the phrase being spoken in the player: it reads on any chunk's background.
+                    setSpan(ForegroundColorSpan(ContextCompat.getColor(ctx, R.color.rl_accent)), mark.second, mark.third, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                }
+            }
             binding.text.textSize = textSize
             binding.root.isActivated = position == current
             val color = when {
@@ -73,8 +101,7 @@ class ChunkAdapter(
             binding.text.setTextColor(ContextCompat.getColor(ctx, color))
             binding.text.customSelectionActionModeCallback = object : ActionMode.Callback {
                 override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
-                    // Listening comes first; the system's own items follow, minus the ones of no use here.
-                    menu.add(Menu.NONE, MENU_LISTEN, 0, R.string.reader_listen_here)
+                    // The app's own items first; the system's follow, minus the ones of no use here.
                     menu.add(Menu.NONE, MENU_BOOKMARK, 1, R.string.reader_bookmark)
                     menu.add(Menu.NONE, MENU_RULE, 2, R.string.rules_from_selection)
                     menu.removeItem(android.R.id.selectAll)
@@ -90,10 +117,6 @@ class ChunkAdapter(
                             val start = minOf(binding.text.selectionStart, binding.text.selectionEnd).coerceAtLeast(0)
                             val end = maxOf(binding.text.selectionStart, binding.text.selectionEnd).coerceAtMost(text.length)
                             if (end > start) onRuleRequest(text.substring(start, end), text)
-                        }
-                        MENU_LISTEN -> {
-                            val at = minOf(binding.text.selectionStart, binding.text.selectionEnd).coerceAtLeast(0)
-                            onListenFrom(position, Sentences.startOf(text, at))
                         }
                         MENU_BOOKMARK -> {
                             val start = minOf(binding.text.selectionStart, binding.text.selectionEnd).coerceAtLeast(0)
@@ -113,7 +136,6 @@ class ChunkAdapter(
 
     private companion object {
         const val MENU_RULE = 0x52554c45
-        const val MENU_LISTEN = 0x4c495354
         const val MENU_BOOKMARK = 0x424b4d4b
     }
 }

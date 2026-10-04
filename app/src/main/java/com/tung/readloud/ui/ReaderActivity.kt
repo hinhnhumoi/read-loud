@@ -1,5 +1,7 @@
 package com.tung.readloud.ui
 
+import androidx.recyclerview.widget.RecyclerView
+import android.widget.TextView
 import android.content.Intent
 import android.os.Bundle
 import android.widget.PopupMenu
@@ -29,10 +31,16 @@ class ReaderActivity : AppCompatActivity() {
     private val novels by lazy { NovelRepository(this) }
     private val adapter = ChunkAdapter(
         onRuleRequest = { selected, chunk -> RuleDialog.show(this, prefill = selected, sample = chunk) },
-        onListenFrom = ::listenFrom,
         onBookmark = { position, selected -> bookmark(position, selected) },
     )
     private var lastScrolledTo = -1
+
+    /** The text keeps the voice in view until the reader scrolls it by hand. */
+    private var following = true
+
+    /** Chunk and character where the voice would start if asked to listen from the reader's place. */
+    private var target: Pair<Int, Int>? = null
+    private var chapterUrl: String? = null
     private var rate = ProgressStore.DEFAULT_RATE
     private var novelId: Long? = null
 
@@ -54,6 +62,21 @@ class ReaderActivity : AppCompatActivity() {
         binding.list.layoutManager = LinearLayoutManager(this)
         binding.list.adapter = adapter
         binding.list.itemAnimator = null
+        binding.list.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                if (newState == RecyclerView.SCROLL_STATE_DRAGGING) following = false
+                if (!following) updateTarget()
+            }
+
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                if (!following) updateTarget()
+            }
+        })
+        binding.btnListenHere.setOnClickListener {
+            target?.let { (position, offset) -> listenFrom(position, offset) }
+            follow(scroll = false)
+        }
+        binding.btnBackToVoice.setOnClickListener { follow(scroll = true) }
 
         binding.btnToggle.setOnClickListener {
             when (ReaderService.state.value.status) {
@@ -95,6 +118,64 @@ class ReaderActivity : AppCompatActivity() {
         }
     }
 
+    /** Back to following the voice: the bar and the mark go, and the text returns to the voice when asked. */
+    private fun follow(scroll: Boolean) {
+        following = true
+        target = null
+        adapter.clearMarker()
+        binding.listenBar.isVisible = false
+        if (scroll) {
+            lastScrolledTo = -1
+            render(ReaderService.state.value)
+        }
+    }
+
+    /** Marks the sentence at the top of the screen and shows the bar, unless that is where the voice already is. */
+    private fun updateTarget() {
+        val s = ReaderService.state.value
+        val found = sentenceAtReadingLine(s.chunks)
+        val spokenChunk = s.chunks.getOrNull(s.chunkIndex)
+        val spoken = spokenChunk?.let { s.chunkIndex to Sentences.startOf(it, (it.length * s.chunkProgress).toInt()) }
+        target = found
+        val show = found != null && found != spoken
+        binding.listenBar.isVisible = show
+        if (!show) {
+            adapter.clearMarker()
+            return
+        }
+        val (position, start) = found!!
+        val text = s.chunks[position]
+        val end = Sentences.split(text).firstOrNull { it.first == start }?.let { it.first + it.second.length } ?: text.length
+        adapter.setMarker(position, start, end)
+    }
+
+    /**
+     * The first sentence that starts on screen: where the eye is when reading by hand. A sentence cut off
+     * by the top edge counts as read.
+     */
+    private fun sentenceAtReadingLine(chunks: List<String>): Pair<Int, Int>? {
+        val list = binding.list
+        val y = list.paddingTop + READING_LINE_DP * resources.displayMetrics.density
+        val child = list.findChildViewUnder(list.width / 2f, y) ?: list.findChildViewUnder(list.width / 2f, y + GAP_DP * resources.displayMetrics.density)
+            ?: return null
+        val position = list.getChildAdapterPosition(child).takeIf { it != RecyclerView.NO_POSITION && it < chunks.size } ?: return null
+        val textView = child.findViewById<TextView>(R.id.text) ?: return null
+        val layout = textView.layout ?: return null
+        val chunk = chunks[position]
+        val inText = (y - child.top - textView.top - textView.totalPaddingTop).toInt()
+        if (inText <= 0) return position to 0
+        val line = layout.getLineForVertical(inText)
+        val lineStart = layout.getLineStart(line)
+        val start = Sentences.startOf(chunk, lineStart)
+        if (layout.getLineForOffset(start) >= line) return position to start
+        val next = Sentences.split(chunk).firstOrNull { it.first > lineStart }?.first
+        return when {
+            next != null -> position to next
+            position + 1 < chunks.size -> position + 1 to 0
+            else -> position to start
+        }
+    }
+
     /** Moves the voice to the sentence picked in the text, and sets it reading if it was not. */
     private fun listenFrom(position: Int, offset: Int) {
         ReaderService.send(this, ReaderService.ACTION_SEEK_CHUNK) {
@@ -124,8 +205,13 @@ class ReaderActivity : AppCompatActivity() {
         }
         binding.empty.isVisible = s.chunks.isEmpty()
         binding.empty.text = s.message ?: getString(R.string.reader_empty)
+        // A new chapter replaces the text the reader was in, so their place there is gone.
+        if (s.url != chapterUrl) {
+            chapterUrl = s.url
+            if (!following) follow(scroll = false)
+        }
         adapter.submit(s.chunks, s.chunkIndex)
-        if (s.chunks.isNotEmpty() && s.chunkIndex != lastScrolledTo) {
+        if (following && s.chunks.isNotEmpty() && s.chunkIndex != lastScrolledTo) {
             lastScrolledTo = s.chunkIndex
             // Keep the chunk being read about a third of the way down, with what came before in view.
             binding.list.post {
@@ -149,5 +235,9 @@ class ReaderActivity : AppCompatActivity() {
 
     private companion object {
         val TEXT_SIZES = listOf(15f, 17f, 19f, 21f, 23f)
+
+        /** How far below the top of the text the reading line sits. */
+        const val READING_LINE_DP = 24
+        const val GAP_DP = 16
     }
 }
