@@ -1,8 +1,9 @@
 package com.tung.readloud.ui
 
+import android.widget.TextView
 import android.text.style.ForegroundColorSpan
 import android.text.Spanned
-import android.text.SpannableString
+import android.text.Spannable
 import android.view.ActionMode
 import android.view.LayoutInflater
 import android.view.Menu
@@ -37,19 +38,17 @@ class ChunkAdapter(
     /** Chunk and character range of the marked sentence. */
     private var marker: Triple<Int, Int, Int>? = null
 
-    fun setMarker(position: Int, start: Int, end: Int) {
+    /**
+     * Marks a sentence, or clears the mark with null. Rows on screen are recoloured in place: rebinding a
+     * long selectable text while it is being scrolled makes the list stutter and can swallow the swipe.
+     */
+    fun mark(list: RecyclerView, next: Triple<Int, Int, Int>?) {
         val old = marker
-        val next = Triple(position, start, end)
         if (old == next) return
         marker = next
-        old?.let { notifyItemChanged(it.first) }
-        notifyItemChanged(position)
-    }
-
-    fun clearMarker() {
-        val old = marker ?: return
-        marker = null
-        notifyItemChanged(old.first)
+        setOf(old?.first, next?.first).filterNotNull().forEach { position ->
+            (list.findViewHolderForAdapterPosition(position) as? Holder)?.applyMarker(position)
+        }
     }
 
     fun submit(newChunks: List<String>, newCurrent: Int) {
@@ -79,18 +78,23 @@ class ChunkAdapter(
 
     override fun onBindViewHolder(holder: Holder, position: Int) = holder.bind(chunks[position], position)
 
+    /** Our colour on the marked sentence, told apart from any other span on the text. */
+    private class MarkSpan(color: Int) : ForegroundColorSpan(color)
+
     inner class Holder(private val binding: ItemChunkBinding) : RecyclerView.ViewHolder(binding.root) {
+        /** Amber, like the phrase being spoken in the player: it reads on any chunk's background. */
+        fun applyMarker(position: Int) {
+            val spannable = binding.text.text as? Spannable ?: return
+            spannable.getSpans(0, spannable.length, MarkSpan::class.java).forEach(spannable::removeSpan)
+            val mark = marker?.takeIf { it.first == position && it.third <= spannable.length && it.second < it.third } ?: return
+            val color = ContextCompat.getColor(binding.root.context, R.color.rl_accent)
+            spannable.setSpan(MarkSpan(color), mark.second, mark.third, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+
         fun bind(text: String, position: Int) {
             val ctx = binding.root.context
-            val mark = marker?.takeIf { it.first == position && it.third <= text.length && it.second < it.third }
-            binding.text.text = if (mark == null) {
-                text
-            } else {
-                SpannableString(text).apply {
-                    // Amber, like the phrase being spoken in the player: it reads on any chunk's background.
-                    setSpan(ForegroundColorSpan(ContextCompat.getColor(ctx, R.color.rl_accent)), mark.second, mark.third, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                }
-            }
+            binding.text.setText(text, TextView.BufferType.SPANNABLE)
+            applyMarker(position)
             binding.text.textSize = textSize
             binding.root.isActivated = position == current
             val color = when {

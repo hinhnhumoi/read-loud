@@ -1,5 +1,6 @@
 package com.tung.readloud.ui
 
+import android.view.View
 import androidx.recyclerview.widget.RecyclerView
 import android.widget.TextView
 import android.content.Intent
@@ -41,6 +42,7 @@ class ReaderActivity : AppCompatActivity() {
     /** Chunk and character where the voice would start if asked to listen from the reader's place. */
     private var target: Pair<Int, Int>? = null
     private var chapterUrl: String? = null
+    private var shownActive: Boolean? = null
     private var rate = ProgressStore.DEFAULT_RATE
     private var novelId: Long? = null
 
@@ -51,8 +53,13 @@ class ReaderActivity : AppCompatActivity() {
         binding.toolbar.setNavigationOnClickListener { finish() }
         binding.toolbar.inflateMenu(R.menu.menu_reader)
         binding.toolbar.menu.findItem(R.id.action_text_size).actionView?.setOnClickListener(::chooseTextSize)
+        binding.toolbar.menu.findItem(R.id.action_listen_here).actionView?.findViewById<View>(R.id.btnListenHere)?.setOnClickListener {
+            target?.let { (position, offset) -> listenFrom(position, offset) }
+            follow(scroll = false)
+        }
         binding.toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
+                R.id.action_back_to_voice -> follow(scroll = true)
                 R.id.action_toc -> ReaderService.state.value.novelId?.let { startActivity(NovelDetailActivity.intent(this, it)) }
                 R.id.action_bookmark -> bookmark(ReaderService.state.value.chunkIndex, null)
                 R.id.action_rules -> startActivity(Intent(this, RulesActivity::class.java))
@@ -65,18 +72,10 @@ class ReaderActivity : AppCompatActivity() {
         binding.list.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                 if (newState == RecyclerView.SCROLL_STATE_DRAGGING) following = false
-                if (!following) updateTarget()
-            }
-
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                if (!following) updateTarget()
+                // Only once the text comes to rest: working it out while it moves makes scrolling stutter.
+                if (newState == RecyclerView.SCROLL_STATE_IDLE && !following) updateTarget()
             }
         })
-        binding.btnListenHere.setOnClickListener {
-            target?.let { (position, offset) -> listenFrom(position, offset) }
-            follow(scroll = false)
-        }
-        binding.btnBackToVoice.setOnClickListener { follow(scroll = true) }
 
         binding.btnToggle.setOnClickListener {
             when (ReaderService.state.value.status) {
@@ -122,8 +121,8 @@ class ReaderActivity : AppCompatActivity() {
     private fun follow(scroll: Boolean) {
         following = true
         target = null
-        adapter.clearMarker()
-        binding.listenBar.isVisible = false
+        adapter.mark(binding.list, null)
+        showListenAction(false)
         if (scroll) {
             lastScrolledTo = -1
             render(ReaderService.state.value)
@@ -138,15 +137,25 @@ class ReaderActivity : AppCompatActivity() {
         val spoken = spokenChunk?.let { s.chunkIndex to Sentences.startOf(it, (it.length * s.chunkProgress).toInt()) }
         target = found
         val show = found != null && found != spoken
-        binding.listenBar.isVisible = show
+        showListenAction(show)
         if (!show) {
-            adapter.clearMarker()
+            adapter.mark(binding.list, null)
             return
         }
         val (position, start) = found!!
         val text = s.chunks[position]
         val end = Sentences.split(text).firstOrNull { it.first == start }?.let { it.first + it.second.length } ?: text.length
-        adapter.setMarker(position, start, end)
+        adapter.mark(binding.list, Triple(position, start, end))
+    }
+
+    /** The toolbar trades the text size button for "Nghe từ đây" while the reader is away from the voice. */
+    private fun showListenAction(show: Boolean) {
+        val menu = binding.toolbar.menu
+        val listen = menu.findItem(R.id.action_listen_here) ?: return
+        if (listen.isVisible == show) return
+        listen.isVisible = show
+        menu.findItem(R.id.action_back_to_voice)?.isVisible = show
+        menu.findItem(R.id.action_text_size)?.isVisible = !show
     }
 
     /**
@@ -198,7 +207,9 @@ class ReaderActivity : AppCompatActivity() {
 
     private fun render(s: ReaderState) {
         val active = s.status == PlaybackStatus.PLAYING || s.status == PlaybackStatus.LOADING
-        binding.toolbar.title = s.title ?: getString(R.string.no_chapter)
+        // Progress arrives several times a second; setting unchanged text would still re-layout the screen.
+        val title = s.title ?: getString(R.string.no_chapter)
+        if (binding.toolbar.title?.toString() != title) binding.toolbar.title = title
         if (s.novelId != novelId) {
             novelId = s.novelId
             lifecycleScope.launch { binding.toolbar.subtitle = s.novelId?.let { novels.findById(it)?.name } }
@@ -218,16 +229,19 @@ class ReaderActivity : AppCompatActivity() {
                 (binding.list.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(s.chunkIndex, binding.list.height / 4)
             }
         }
-        binding.transportLabel.text = if (s.chunkCount > 0) {
+        binding.transportLabel.setTextIfChanged(if (s.chunkCount > 0) {
             val speed = if (s.status == PlaybackStatus.IDLE) rate else s.speechRate
             getString(R.string.player_chunk_of, s.chunkIndex + 1, s.chunkCount) + " · " + getString(R.string.player_speed, PlayerUi.format(speed))
         } else {
             s.message ?: getString(R.string.no_chapter)
-        }
+        })
         val fraction = if (s.chunkCount > 0) (s.chunkIndex + s.chunkProgress) / s.chunkCount else 0f
-        binding.transportProgress.setProgressCompat((fraction * 1000).toInt(), false)
-        binding.btnToggle.setIconResource(if (active) R.drawable.ic_pause else R.drawable.ic_play)
-        binding.btnToggle.contentDescription = getString(if (active) R.string.action_pause else R.string.action_play)
+        binding.transportProgress.setProgressIfChanged((fraction * 1000).toInt())
+        if (shownActive != active) {
+            shownActive = active
+            binding.btnToggle.setIconResource(if (active) R.drawable.ic_pause else R.drawable.ic_play)
+            binding.btnToggle.contentDescription = getString(if (active) R.string.action_pause else R.string.action_play)
+        }
         val hasChapter = s.chunks.isNotEmpty()
         binding.btnPrevChunk.isEnabled = hasChapter
         binding.btnNextChunk.isEnabled = hasChapter

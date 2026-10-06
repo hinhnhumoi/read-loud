@@ -2,6 +2,12 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
+        android:id="@+id/action_listen_here"
+        android:title="@string/reader_listen_here"
+        android:visible="false"
+        app:actionLayout="@layout/action_listen_here"
+        app:showAsAction="always" />
+    <item
         android:id="@+id/action_text_size"
         android:title="@string/reader_text_size"
         app:actionLayout="@layout/action_text_size"
@@ -12,6 +18,11 @@
         android:title="@string/toc_title"
         app:iconTint="@color/rl_text"
         app:showAsAction="always" />
+    <item
+        android:id="@+id/action_back_to_voice"
+        android:title="@string/reader_back_to_voice"
+        android:visible="false"
+        app:showAsAction="never" />
     <item
         android:id="@+id/action_bookmark"
         android:title="@string/reader_bookmark_current"

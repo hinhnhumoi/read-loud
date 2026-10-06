@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:paddingEnd="4dp">
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnListenHere"
+        style="@style/Widget.RL.Button.Primary"
+        android:layout_width="wrap_content"
+        android:layout_height="36dp"
+        android:layout_gravity="center_vertical"
+        android:minHeight="36dp"
+        android:paddingHorizontal="12dp"
+        android:text="@string/reader_listen_here"
+        android:textSize="13sp"
+        app:cornerRadius="18dp"
+        app:icon="@drawable/ic_play"
+        app:iconPadding="4dp"
+        app:iconSize="14dp" />
+</FrameLayout>
