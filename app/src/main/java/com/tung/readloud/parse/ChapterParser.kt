@@ -11,6 +11,7 @@ class ChapterParser {
 
     fun parse(url: String, html: String): Chapter {
         val doc = Jsoup.parse(html, url)
+        if (XenForo.isForum(doc)) return parseForum(url, doc)
         val config = SiteConfigs.forUrl(url)
         val nextUrl = NextChapterFinder.find(doc, url, config)
 
@@ -25,6 +26,24 @@ class ChapterParser {
         return Chapter(
             url, title, paragraphs, nextUrl, doc.title(), TocParser.findTocUrl(doc, url, config),
             prevUrl = NextChapterFinder.findPrevious(doc, url, config),
+        )
+    }
+
+    /**
+     * A forum thread: the first post is the chapter. Its next and previous links are only those written in
+     * the post, since the page's own "next" goes to more comments; without them the reader goes by the
+     * table of contents.
+     */
+    private fun parseForum(url: String, doc: Document): Chapter {
+        val post = XenForo.firstPost(doc, url)
+        val title = XenForo.title(doc) ?: fallbackTitle(doc)
+        val paragraphs = post?.let { HtmlText.paragraphs(it, XenForo.removeSelectors) }.orEmpty().filterNot { it == title }
+        return Chapter(
+            url, title, paragraphs,
+            nextUrl = post?.let { NextChapterFinder.find(it, url, null, guess = false) },
+            pageTitle = doc.title(),
+            tocUrl = TocParser.findTocUrl(doc, url, null),
+            prevUrl = post?.let { NextChapterFinder.findPrevious(it, url, null) },
         )
     }
 

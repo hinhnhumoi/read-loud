@@ -49,6 +49,7 @@ import com.tung.readloud.data.RuleRepository
 import com.tung.readloud.data.VoiceEngine
 import com.tung.readloud.data.VoiceSettings
 import com.tung.readloud.data.applyingTo
+import com.tung.readloud.fetch.TocLoader
 import com.tung.readloud.fetch.ChallengeRequiredException
 import com.tung.readloud.fetch.PageFetcher
 import com.tung.readloud.model.Chapter
@@ -142,7 +143,11 @@ class ReaderService : Service() {
     private var index = 0
     private var queuedUpTo = -1
     private var chapterSeq = 0
-    private var prefetch: Deferred<Chapter>? = null
+    /** The next chapter, being loaded while this one plays; it yields null when there is none. */
+    private var prefetch: Deferred<Chapter?>? = null
+
+    /** Novels whose chapter list was already reloaded to find a next chapter, so it is not fetched every time. */
+    private val tocReloaded = mutableSetOf<Long>()
     private var loadJob: Job? = null
     private var bufferJob: Job? = null
     private var pauseRequested = false
@@ -585,7 +590,8 @@ class ReaderService : Service() {
         index = startIndex.coerceIn(0, (chunks.size - 1).coerceAtLeast(0))
         chapterSeq++
         queuedUpTo = index - 1
-        prefetch = next.nextUrl?.takeIf { it != next.url }?.let { url -> scope.async { loadChapter(url) } }
+        val nextOf = novelId
+        prefetch = scope.async { nextUrlOf(next, nextOf)?.let { loadChapter(it) } }
         setState {
             copy(
                 status = PlaybackStatus.PLAYING, novelId = this@ReaderService.novelId, url = next.url, title = next.title,
@@ -858,6 +864,10 @@ class ReaderService : Service() {
         loadJob = scope.launch {
             try {
                 val next = pending.await()
+                if (next == null) {
+                    finish(getString(R.string.finished_no_next))
+                    return@launch
+                }
                 val samePage = next.url == current.url ||
                     (next.title == current.title && next.paragraphs == current.paragraphs)
                 if (samePage) finish(getString(R.string.finished_no_next)) else beginChapter(next, 0)
@@ -896,6 +906,37 @@ class ReaderService : Service() {
             EventLog.log("Previous chapter: $previous")
             startFrom(previous, 0, id, startPaused = wasPaused)
         }
+    }
+
+    /**
+     * The page's own link to the next chapter, else the chapter after this one in the table of contents. A
+     * forum thread has no such link, so its list is read once when the chapter is not in the saved one.
+     */
+    private suspend fun nextUrlOf(current: Chapter, id: Long?): String? {
+        current.nextUrl?.takeIf { it != current.url }?.let { return it }
+        if (BookUrl.isBook(current.url) || id == null) return null
+        val key = TocParser.normalize(current.url)
+        fun after(urls: List<String>): String? {
+            val at = urls.indexOfFirst { TocParser.normalize(it) == key }
+            return if (at >= 0) urls.getOrNull(at + 1) else null
+        }
+        val saved = library.tocEntries(id)
+        after(saved.map { it.url })?.let { return it }
+        if (!tocReloaded.add(id)) return null
+        val tocUrl = library.findById(id)?.tocUrl ?: current.tocUrl ?: return null
+        val loaded = try {
+            TocLoader(fetcher).load(tocUrl) { _, _ -> }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            EventLog.log("Next chapter: could not read the chapter list $tocUrl", e)
+            return null
+        }
+        // A list that came back shorter is more likely a failed load than chapters taken down.
+        if (loaded.size >= saved.size && loaded.isNotEmpty()) library.saveToc(id, tocUrl, loaded)
+        val found = after(loaded.map { it.url })
+        EventLog.log("Next chapter: ${if (found != null) "found" else "not found"} in the chapter list (${loaded.size} chapters)")
+        return found
     }
 
     /** The book's own order, then the saved table of contents, then the page's link, then the URL's number. */
@@ -1112,9 +1153,10 @@ class ReaderService : Service() {
             try {
                 synthesizeInBackground(source, rest)
                 var ch = current
+                val id = novelId
                 while (done < ahead) {
-                    val url = ch.nextUrl?.takeIf { it != ch.url } ?: break
-                    ch = if (done == 0 && nextText != null) nextText.await() else loadChapter(url)
+                    val following = if (done == 0 && nextText != null) nextText.await() else nextUrlOf(ch, id)?.let { loadChapter(it) }
+                    ch = following ?: break
                     synthesizeInBackground(source, chunksOf(ch))
                     done++
                     setState { copy(bufferedChapters = done) }

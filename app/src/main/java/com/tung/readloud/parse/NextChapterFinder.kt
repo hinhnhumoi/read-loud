@@ -1,6 +1,6 @@
 package com.tung.readloud.parse
 
-import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
 import java.net.URI
 
 /** Finds the URL of the next or previous chapter: site selector, rel=next/prev, link text, then URL numbering. */
@@ -17,7 +17,8 @@ object NextChapterFinder {
     private val chapterNumber = Regex("(?i)(ch[ưu][ơo]ng|chapter|chap|ch|c)[-_/=]?(\\d+)")
     private val trailingNumber = Regex("(\\d+)(?=[^\\d]*$)")
 
-    fun find(doc: Document, currentUrl: String, config: SiteConfig?): String? {
+    /** [guess] falls back to the URL's own number, which means nothing for thread ids on a forum. */
+    fun find(doc: Element, currentUrl: String, config: SiteConfig?, guess: Boolean = true): String? {
         val current = normalize(currentUrl)
         val host = hostOf(currentUrl)
 
@@ -35,10 +36,10 @@ object NextChapterFinder {
             .mapNotNull { valid(it.absUrl("href"), current, host) }
             .firstOrNull()
             ?.let { return it }
-        return guessFromUrl(currentUrl)
+        return if (guess) guessFromUrl(currentUrl) else null
     }
 
-    fun findPrevious(doc: Document, currentUrl: String, config: SiteConfig?): String? {
+    fun findPrevious(doc: Element, currentUrl: String, config: SiteConfig?): String? {
         val current = normalize(currentUrl)
         val host = hostOf(currentUrl)
 
@@ -86,6 +87,5 @@ object NextChapterFinder {
 
     private fun hostOf(url: String): String? = runCatching { URI(url).host?.lowercase() }.getOrNull()
 
-    private fun normalize(url: String): String =
-        url.substringBefore('#').trimEnd('/').removePrefix("https://").removePrefix("http://").removePrefix("www.")
+    private fun normalize(url: String): String = TocParser.normalize(url)
 }

@@ -3,6 +3,7 @@ package com.tung.readloud.parse
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import org.jsoup.nodes.TextNode
 import java.net.URI
 
 /** Finds a novel's table of contents from a chapter page and reads chapter links from TOC pages. */
@@ -18,6 +19,7 @@ object TocParser {
     private val chapterText = Regex("(?iu)(chương|chuong|chapter|chap\\b|quyển|tập|hồi|\\bch\\.?\\s*\\d|第)")
     private val numberOnly = Regex("^\\s*\\d{1,4}\\s*$")
     private val pageSuffix = Regex("(?i)(/trang-\\d+|/page/\\d+|/\\d+)/?$")
+    private const val MAX_LEAD_CHARS = 40
     private val skipHref = Regex("(?i)(\\?share=|/wp-content/|replytocom=|/wp-login|/feed/?$|#comment|/tag/|/category/|/author/)")
 
     /** The link on a chapter page that leads to the novel's chapter list, if the page has one. */
@@ -44,7 +46,7 @@ object TocParser {
         for (a in root.select("a[href]")) {
             val href = a.absUrl("href").substringBefore('#')
             if (!valid(href, host) || skipHref.containsMatchIn(href)) continue
-            val text = a.text().trim().ifEmpty { a.attr("title").trim() }
+            val text = labelOf(a)
             if (text.isEmpty()) continue
             val key = normalize(href)
             if (numberOnly.matches(text) && tocBase(href) == base) {
@@ -57,7 +59,21 @@ object TocParser {
         return Page(entries.values.toList(), pages.toList())
     }
 
+    /**
+     * The link's text, with the words just before it when the list reads "Chương 937: <a>Its name</a>", so
+     * the entry keeps its number.
+     */
+    private fun labelOf(a: Element): String {
+        val text = a.text().trim().ifEmpty { a.attr("title").trim() }
+        if (chapterText.containsMatchIn(text)) return text
+        // Only a short lead-in such as "Chương 937:", not a whole sentence that happens to mention a chapter.
+        val before = (a.previousSibling() as? TextNode)?.text()?.trim()?.takeIf { it.length <= MAX_LEAD_CHARS }.orEmpty()
+        return if (before.isNotEmpty() && chapterText.containsMatchIn(before)) "$before $text".trim() else text
+    }
+
     private fun contentRoot(doc: Document, config: SiteConfig?): Element {
+        // On a forum the list is the first post of its thread; the rest of the page is menus and comments.
+        if (XenForo.isForum(doc)) XenForo.firstPost(doc, doc.location())?.let { return it }
         val selectors = listOfNotNull(config?.contentSelector) + SiteConfigs.genericContentSelectors
         return selectors.asSequence()
             .mapNotNull { sel -> runCatching { doc.select(sel).maxByOrNull { it.select("a[href]").size } }.getOrNull() }
@@ -68,11 +84,22 @@ object TocParser {
     /** The TOC URL with any page-number suffix removed, so page 1 and page 5 compare equal. */
     fun tocBase(url: String): String {
         val noQuery = url.substringBefore('#').replace(Regex("(?i)[?&]page=\\d+"), "")
-        return normalize(pageSuffix.replace(normalize(noQuery), ""))
+        val plain = normalize(noQuery)
+        // A forum thread's number names the thread, not a page of it; its pages are already folded in.
+        if (forumThread.containsMatchIn(plain)) return plain
+        return normalize(pageSuffix.replace(plain, ""))
     }
 
-    fun normalize(url: String): String =
-        url.substringBefore('#').trimEnd('/').removePrefix("https://").removePrefix("http://").removePrefix("www.")
+    /**
+     * A key for comparing links to the same page. Forum threads are known by their number alone: a thread
+     * is linked both as "threads/3/" and as "threads/some-title.3/", and its later pages are the same chapter.
+     */
+    fun normalize(url: String): String {
+        val plain = url.substringBefore('#').trimEnd('/').removePrefix("https://").removePrefix("http://").removePrefix("www.")
+        return forumThread.replace(plain) { "threads/" + it.groupValues[1] }
+    }
+
+    private val forumThread = Regex("threads/(?:[^/?#&]*\\.)?(\\d+)(?:/.*)?$")
 
     private fun valid(href: String, host: String?): Boolean =
         (href.startsWith("http://") || href.startsWith("https://")) && (host == null || hostOf(href) == host)

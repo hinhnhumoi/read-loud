@@ -8,7 +8,11 @@ object TextNormalizer {
     private const val JUNK_MAX_CHARS = 120
 
     private val junkLines = listOf(
-        Regex("(?iu)^(edit(or)?|beta(-?reader)?|biên tập|dịch giả|dịch|người dịch|translator|trans|converter|convert|nguồn|source|raw)\\s*[:：]"),
+        // A credit line names one role or several joined up, as in "Edit & beta: …" or "Dịch, biên tập: …".
+        Regex(
+            "(?iu)^(edit(or)?|beta(-?reader)?|biên tập|dịch giả|dịch|người dịch|translator|trans|converter|convert|nguồn|source|raw)" +
+                "(\\s*(&|\\+|/|,|và|and)\\s*(edit(or)?|beta(-?reader)?|biên tập|dịch|người dịch|translator|trans|convert(er)?))*\\s*[:：]",
+        ),
         Regex("(?iu)(cầu|xin)\\s+(vote|phiếu|đề cử|like|kim phiếu|nguyệt phiếu|donate|ủng hộ|comment|bình luận)"),
         Regex("(?iu)^(chương|chap)\\s*(trước|sau|tiếp)$|^mục lục$|^(previous|next)(\\s+chapter)?$"),
         Regex("^[\\s\\p{P}\\p{S}]+$"),
