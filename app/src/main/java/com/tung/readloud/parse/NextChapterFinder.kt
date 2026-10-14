@@ -14,6 +14,9 @@ object NextChapterFinder {
         "(?i)(ch[ưu][ơo]ng\\s*tr[ưu][ơo]c|chap(ter)?\\s*tr[ưu][ơo]c|trang\\s*tr[ưu][ơo]c|" +
             "^\\s*(prev|previous|tr[ưu][ơo]c)\\s*$|prev(ious)?\\s*(chapter|chap|page)|«|‹|<<|←)",
     )
+    // A button drawn as a picture is known by the picture's file name, and only when that is the whole name.
+    private val nextImage = Regex("(?i)^(next|tiep|sau)([-_ ]?(chapter|chap|chuong))?$")
+    private val prevImage = Regex("(?i)^(prev|previous|back|truoc)([-_ ]?(chapter|chap|chuong))?$")
     private val chapterNumber = Regex("(?i)(ch[ưu][ơo]ng|chapter|chap|ch|c)[-_/=]?(\\d+)")
     private val trailingNumber = Regex("(\\d+)(?=[^\\d]*$)")
 
@@ -30,8 +33,9 @@ object NextChapterFinder {
             ?.let { return it }
         doc.select("a[href]").asSequence()
             .filter { a ->
-                val label = a.text().ifBlank { a.attr("title") }.ifBlank { a.attr("aria-label") }
-                nextText.containsMatchIn(label) && !prevText.containsMatchIn(label)
+                val label = labelOf(a)
+                if (label.isBlank()) imageName(a)?.let { nextImage.matches(it) } == true
+                else nextText.containsMatchIn(label) && !prevText.containsMatchIn(label)
             }
             .mapNotNull { valid(it.absUrl("href"), current, host) }
             .firstOrNull()
@@ -51,8 +55,9 @@ object NextChapterFinder {
             ?.let { return it }
         return doc.select("a[href]").asSequence()
             .filter { a ->
-                val label = a.text().ifBlank { a.attr("title") }.ifBlank { a.attr("aria-label") }
-                prevChapterText.containsMatchIn(label) && !nextText.containsMatchIn(label)
+                val label = labelOf(a)
+                if (label.isBlank()) imageName(a)?.let { prevImage.matches(it) } == true
+                else prevChapterText.containsMatchIn(label) && !nextText.containsMatchIn(label)
             }
             .mapNotNull { valid(it.absUrl("href"), current, host) }
             .firstOrNull()
@@ -76,6 +81,14 @@ object NextChapterFinder {
         val query = uri.rawQuery?.let { "?$it" } ?: ""
         return "${uri.scheme}://${uri.rawAuthority}$replaced$query"
     }
+
+    private fun labelOf(a: Element): String =
+        a.text().ifBlank { a.attr("title") }.ifBlank { a.attr("aria-label") }.ifBlank { a.selectFirst("img[alt]")?.attr("alt").orEmpty() }
+
+    /** "next" for a link that is only <img src=".../next.png">. */
+    private fun imageName(a: Element): String? =
+        a.selectFirst("img[src]")?.attr("src")?.substringBefore('?')?.substringAfterLast('/')?.substringBeforeLast('.')
+            ?.takeIf { it.isNotBlank() }
 
     private fun valid(href: String, current: String, host: String?): String? {
         if (href.isBlank()) return null

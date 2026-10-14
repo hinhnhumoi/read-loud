@@ -38,12 +38,12 @@ object TocParser {
 
     fun parse(html: String, url: String): Page {
         val doc = Jsoup.parse(html, url)
-        val root = contentRoot(doc, SiteConfigs.forUrl(url))
+        val roots = contentRoots(doc, SiteConfigs.forUrl(url))
         val host = hostOf(url)
         val base = tocBase(url)
         val entries = LinkedHashMap<String, Entry>()
         val pages = LinkedHashSet<String>()
-        for (a in root.select("a[href]")) {
+        for (a in roots.flatMap { it.select("a[href]") }) {
             val href = a.absUrl("href").substringBefore('#')
             if (!valid(href, host) || skipHref.containsMatchIn(href)) continue
             val text = labelOf(a)
@@ -71,14 +71,16 @@ object TocParser {
         return if (before.isNotEmpty() && chapterText.containsMatchIn(before)) "$before $text".trim() else text
     }
 
-    private fun contentRoot(doc: Document, config: SiteConfig?): Element {
-        // On a forum the list is the first post of its thread; the rest of the page is menus and comments.
-        if (XenForo.isForum(doc)) XenForo.firstPost(doc, doc.location())?.let { return it }
+    private fun contentRoots(doc: Document, config: SiteConfig?): List<Element> {
+        // On a forum the list is the opening posts of its thread; the rest of the page is menus and comments.
+        if (XenForo.isForum(doc)) XenForo.starterPosts(doc, doc.location()).takeIf { it.isNotEmpty() }?.let { return it }
         val selectors = listOfNotNull(config?.contentSelector) + SiteConfigs.genericContentSelectors
-        return selectors.asSequence()
-            .mapNotNull { sel -> runCatching { doc.select(sel).maxByOrNull { it.select("a[href]").size } }.getOrNull() }
-            .firstOrNull { it.select("a[href]").size >= 5 }
-            ?: doc.body()
+        return listOf(
+            selectors.asSequence()
+                .mapNotNull { sel -> runCatching { doc.select(sel).maxByOrNull { it.select("a[href]").size } }.getOrNull() }
+                .firstOrNull { it.select("a[href]").size >= 5 }
+                ?: doc.body(),
+        )
     }
 
     /** The TOC URL with any page-number suffix removed, so page 1 and page 5 compare equal. */

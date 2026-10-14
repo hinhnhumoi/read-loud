@@ -96,6 +96,40 @@ class XenForoTest {
     }
 
     @Test
+    fun followsChapterButtonsDrawnAsPictures() {
+        val page = thread.replace(
+            "Cuối chương.<br /><br />",
+            """Cuối chương.<br /><br />
+              <a href="https://forum.example.com/index.php?threads/truyen-thu-chuong-6.2/"><img src="https://img.example.com/x1/back.png" alt="" /></a>
+              <a href="https://forum.example.com/index.php?threads/truyen-thu-chuong-8.4/"><img src="https://img.example.com/x2/next.png" alt="" /></a>
+              <a href="https://forum.example.com/index.php?threads/muc-luc-truyen-thu.94/"><img src="https://img.example.com/x3/next_and_back_and_all.png" alt="" /></a><br />""",
+        )
+        val chapter = ChapterParser().parse(url, page)
+
+        assertEquals("https://forum.example.com/index.php?threads/truyen-thu-chuong-8.4/", chapter.nextUrl)
+        assertEquals("https://forum.example.com/index.php?threads/truyen-thu-chuong-6.2/", chapter.prevUrl)
+    }
+
+    @Test
+    fun readsAChapterListCarriedOnInTheNextPosts() {
+        fun post(author: String, body: String) =
+            """<article class="message message--post" data-author="$author"><div class="message-userContent">
+               <article class="message-body"><div class="bbWrapper">$body</div></article></div></article>"""
+        fun line(n: Int, id: Int) = """Chương $n: <a href="https://forum.example.com/index.php?threads/truyen-thu-chuong-$n.$id/">Tên $n</a><br />"""
+        val toc = """
+            <html><body><h1 class="p-title-value">Mục lục</h1>
+            ${post("Người Dịch", (7..9).joinToString("") { line(it, it * 10) })}
+            ${post("Người Dịch", (10..11).joinToString("") { line(it, it * 10) })}
+            ${post("Độc Giả", line(99, 990))}
+            ${post("Người Dịch", line(12, 120))}
+            </body></html>
+        """.trimIndent()
+        val page = TocParser.parse(toc, "https://forum.example.com/index.php?threads/muc-luc-truyen-thu.94/")
+
+        assertEquals((7..11).map { "Chương $it: Tên $it" }, page.entries.map { it.title })
+    }
+
+    @Test
     fun dropsCreditLinesButKeepsStoryMentioningThem() {
         val lines = listOf(
             "Edit & beta: Lá Mùa Thu",

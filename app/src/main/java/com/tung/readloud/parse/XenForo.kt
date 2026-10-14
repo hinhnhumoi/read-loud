@@ -28,6 +28,21 @@ object XenForo {
             ?: doc.selectFirst("li.message blockquote.messageText")
     }
 
+    /**
+     * The first post and the posts right after it by the same poster, who carries on a list too long for one
+     * post. Stops at the first comment by anyone else.
+     */
+    fun starterPosts(doc: Document, url: String): List<Element> {
+        val first = firstPost(doc, url) ?: return emptyList()
+        val articles = doc.select("article.message--post")
+        val author = articles.firstOrNull()?.attr("data-author")?.takeIf { it.isNotEmpty() } ?: return listOf(first)
+        return articles.asSequence()
+            .takeWhile { it.attr("data-author") == author }
+            .mapNotNull { it.selectFirst(".message-body .bbWrapper") }
+            .toList()
+            .ifEmpty { listOf(first) }
+    }
+
     fun title(doc: Document): String? =
         doc.selectFirst("h1.p-title-value, .titleBar h1")?.text()?.trim()?.takeIf { it.isNotEmpty() }
 }
