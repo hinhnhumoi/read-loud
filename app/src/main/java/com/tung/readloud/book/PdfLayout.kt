@@ -6,8 +6,8 @@ import java.text.Normalizer
 /** One line of text as the PDF placed it, in points from the page's top-left corner; [y] is the baseline. */
 data class PdfLine(val text: String, val left: Float, val right: Float, val y: Float)
 
-/** A bookmark from the PDF outline, pointing at a zero-based page. */
-data class PdfMark(val title: String, val page: Int)
+/** A bookmark from the PDF outline, pointing at a zero-based page; [depth] 0 is the outline's top level. */
+data class PdfMark(val title: String, val page: Int, val depth: Int = 0)
 
 /**
  * Turns the lines of a text PDF back into chapters of paragraphs: drops page numbers and running headers
@@ -21,6 +21,9 @@ object PdfLayout {
     private const val INTRO_MIN_CHARS = 200
     private const val BODY_LINE_CHARS = 20
 
+    /** Bookmarks this far apart on average are parts or volumes, so the ones inside them are the chapters. */
+    private const val LONG_CHAPTER_CHARS = 80_000
+
     private val pageNumber = Regex("(?iu)^[-–—|\\s]*(trang|page|tr\\.|p\\.)?\\s*(\\d{1,4}|[ivxlc]{1,7})(\\s*(/|of|trên|\\|)\\s*\\d{1,4})?[-–—|\\s]*$")
     private val whitespace = Regex("[\\s\\u00a0\\u200b]+")
     private const val SENTENCE_END = ".!?…:;\"”’»)]"
@@ -33,13 +36,29 @@ object PdfLayout {
                 if (text.isEmpty()) null else line.copy(text = text)
             }
         }
-        if (clean.sumOf { page -> page.sumOf { it.text.length } } < MIN_TEXT_CHARS) {
+        val totalChars = clean.sumOf { page -> page.sumOf { it.text.length } }
+        if (totalChars < MIN_TEXT_CHARS) {
             throw IOException("PDF này không có chữ (có thể là bản scan dạng ảnh), app chỉ đọc được PDF dạng chữ")
         }
-        val paragraphs = paragraphs(stripFurniture(clean))
+        val chapterMarks = chapterMarks(marks, totalChars)
+        val paragraphs = paragraphs(stripFurniture(clean), chapterMarks.map { it.page }.toSet())
         if (paragraphs.isEmpty()) throw IOException("Không tìm thấy nội dung trong PDF")
-        val chapters = byMarks(paragraphs, marks) ?: TxtParser.split(paragraphs.map { it.text })
+        val chapters = byMarks(paragraphs, chapterMarks) ?: TxtParser.split(paragraphs.map { it.text })
         return ParsedBook(title, author, chapters)
+    }
+
+    /**
+     * The bookmarks at the outline level that holds the chapters: the top one, unless it is a single title
+     * over everything or a few long parts. The sections bookmarked inside a chapter are not chapters.
+     */
+    internal fun chapterMarks(marks: List<PdfMark>, totalChars: Int): List<PdfMark> {
+        val deepest = marks.maxOfOrNull { it.depth } ?: return marks
+        for (depth in 0..deepest) {
+            val level = marks.filter { it.depth <= depth }
+            val starts = level.map { it.page }.distinct().size
+            if (starts >= 2 && totalChars / starts <= LONG_CHAPTER_CHARS) return level
+        }
+        return marks
     }
 
     /** Removes page numbers and lines repeated at the same edge of many pages. */
@@ -97,8 +116,11 @@ object PdfLayout {
         )
     }
 
-    /** Joins lines back into paragraphs, also across page breaks. */
-    internal fun paragraphs(pages: List<List<PdfLine>>): List<Paragraph> {
+    /**
+     * Joins lines back into paragraphs, also across page breaks; a finished sentence is not carried onto a
+     * page in [breaks], where a chapter starts.
+     */
+    internal fun paragraphs(pages: List<List<PdfLine>>, breaks: Set<Int> = emptySet()): List<Paragraph> {
         val document = metrics(pages.flatten(), pages.flatMap(::steps))
         val pageMetrics = pages.map { metrics(it, steps(it)) ?: document }
         val lines = pages.flatMapIndexed { index, page -> page.map { index to it } }
@@ -114,7 +136,7 @@ object PdfLayout {
                 appendLine(current, line.text)
             }
             val next = lines.getOrNull(i + 1)
-            if (next == null || endsParagraph(line, pageMetrics[page], next.second, pageMetrics[next.first], next.first == page)) {
+            if (next == null || (next.first != page && next.first in breaks && line.text.last() in SENTENCE_END) || endsParagraph(line, pageMetrics[page], next.second, pageMetrics[next.first], next.first == page)) {
                 out += Paragraph(current.toString(), startPage)
                 current.clear()
             }
@@ -155,7 +177,7 @@ object PdfLayout {
         }
         if (ordered.map { it.page }.distinct().size < 2) return null
 
-        class Start(val titles: MutableList<String>, val index: Int, val skipHeading: Boolean)
+        class Start(val titles: MutableList<String>, val index: Int, val headingParagraphs: Int)
         val starts = mutableListOf<Start>()
         for (mark in ordered) {
             val title = Normalizer.normalize(mark.title, Normalizer.Form.NFC).let { whitespace.replace(it, " ").trim() }
@@ -165,13 +187,22 @@ object PdfLayout {
             )
             val titleKey = matchKey(title)
             var heading: Int? = null
-            var exact = false
+            var headingParagraphs = 0
             var k = from
             while (k < paragraphs.size && paragraphs[k].page <= mark.page) {
                 val key = matchKey(paragraphs[k].text)
-                if (key == titleKey) {
+                // A long heading may wrap into a paragraph of its own: "Chương 5. Các use case và" + "Štáty".
+                var joined = key
+                var end = k
+                while (joined.isNotEmpty() && joined.length < titleKey.length && titleKey.startsWith(joined) &&
+                    end + 1 < paragraphs.size && paragraphs[end + 1].page <= mark.page
+                ) {
+                    end++
+                    joined += matchKey(paragraphs[end].text)
+                }
+                if (joined == titleKey) {
                     heading = k
-                    exact = true
+                    headingParagraphs = end - k + 1
                     break
                 }
                 if (titleKey.isNotEmpty() && key.startsWith(titleKey) && !key[titleKey.length].isDigit()) {
@@ -185,7 +216,7 @@ object PdfLayout {
             if (previous != null && index <= previous.index) {
                 previous.titles += title
             } else {
-                starts += Start(mutableListOf(title), index, exact)
+                starts += Start(mutableListOf(title), index, headingParagraphs)
             }
         }
 
@@ -195,7 +226,7 @@ object PdfLayout {
         var pendingTitles = mutableListOf<String>()
         starts.forEachIndexed { i, start ->
             val end = starts.getOrNull(i + 1)?.index ?: paragraphs.size
-            val bodyStart = if (start.skipHeading) start.index + 1 else start.index
+            val bodyStart = start.index + start.headingParagraphs
             val body = if (bodyStart < end) paragraphs.subList(bodyStart, end).map { it.text } else emptyList()
             pendingTitles += start.titles
             if (body.isNotEmpty()) {

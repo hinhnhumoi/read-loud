@@ -61,8 +61,9 @@ class PdfLayoutTest {
     private class Sample(val pages: List<List<PdfLine>>, val marks: List<PdfMark>)
 
     /** sample.pdf starts every chapter on a new page; in sample-flow.pdf chapters and paragraphs run across pages. */
-    private fun sample(name: String = "sample.pdf"): Sample {
-        val bytes = javaClass.classLoader!!.getResourceAsStream(name)!!.readBytes()
+    private fun sample(name: String = "sample.pdf"): Sample = load(javaClass.classLoader!!.getResourceAsStream(name)!!.readBytes())
+
+    private fun load(bytes: ByteArray): Sample {
         PDDocument.load(bytes).use { doc ->
             val stripper = LineStripper().apply { sortByPosition = true }
             stripper.writeText(doc, object : Writer() {
@@ -71,14 +72,14 @@ class PdfLayoutTest {
                 override fun close() {}
             })
             val marks = mutableListOf<PdfMark>()
-            fun walk(node: PDOutlineNode) {
+            fun walk(node: PDOutlineNode, depth: Int) {
                 for (item in node.children()) {
                     val index = item.findDestinationPage(doc)?.let { doc.pages.indexOf(it) } ?: -1
-                    if (index >= 0) marks += PdfMark(item.title.trim(), index)
-                    walk(item)
+                    if (index >= 0) marks += PdfMark(item.title.trim(), index, depth)
+                    walk(item, depth + 1)
                 }
             }
-            doc.documentCatalog.documentOutline?.let(::walk)
+            doc.documentCatalog.documentOutline?.let { walk(it, 0) }
             return Sample(stripper.pages, marks)
         }
     }
@@ -120,6 +121,41 @@ class PdfLayoutTest {
         assertTrue(sample.pages.size > sample.marks.map { it.page }.distinct().size)
         checkChapters(PdfLayout.build("Thử", null, sample.pages, sample.marks))
         checkChapters(PdfLayout.build("Thử", null, sample.pages, emptyList()))
+    }
+
+    @Test
+    fun sectionsBookmarkedInsideAChapterAreNotChapters() {
+        val marks = listOf(
+            PdfMark("Chương 1", 0, 0), PdfMark("Mục 1.1", 0, 1), PdfMark("Mục 1.2", 3, 1), PdfMark("Ý nhỏ", 4, 2),
+            PdfMark("Chương 2", 8, 0), PdfMark("Mục 2.1", 9, 1),
+        )
+
+        assertEquals(listOf("Chương 1", "Chương 2"), PdfLayout.chapterMarks(marks, 40_000).map { it.title })
+    }
+
+    @Test
+    fun aTitleOverEverythingOrLongPartsLeadToTheChaptersInside() {
+        val wrapped = listOf(PdfMark("Tên sách", 0, 0), PdfMark("Chương 1", 1, 1), PdfMark("Chương 2", 5, 1))
+        val parts = listOf(
+            PdfMark("Phần 1", 0, 0), PdfMark("Chương 1", 0, 1), PdfMark("Chương 2", 50, 1),
+            PdfMark("Phần 2", 100, 0), PdfMark("Chương 3", 100, 1), PdfMark("Chương 4", 150, 1),
+        )
+
+        assertEquals(listOf("Tên sách", "Chương 1", "Chương 2"), PdfLayout.chapterMarks(wrapped, 20_000).map { it.title })
+        assertEquals(6, PdfLayout.chapterMarks(parts, 400_000).size)
+    }
+
+    @Test
+    fun aHeadingWrappedOverTwoLinesIsNotReadAsText() {
+        val paragraphs = listOf(
+            PdfLayout.Paragraph("Chương 1. Mở màn", 0), PdfLayout.Paragraph("Nội dung một.", 0),
+            PdfLayout.Paragraph("Chương 2. Các use case: RLFO và", 1), PdfLayout.Paragraph("Štáty", 1),
+            PdfLayout.Paragraph("Nội dung hai.", 1),
+        )
+        val marks = listOf(PdfMark("Chương 1. Mở màn", 0), PdfMark("Chương 2. Các use case: RLFO và Štáty", 1))
+        val chapters = PdfLayout.byMarks(paragraphs, marks)!!
+
+        assertEquals(listOf(listOf("Nội dung một."), listOf("Nội dung hai.")), chapters.map { it.paragraphs })
     }
 
     private fun line(text: String, left: Float = 72f, right: Float = 520f, y: Float) = PdfLine(text, left, right, y)

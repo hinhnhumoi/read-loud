@@ -54,7 +54,7 @@ object PdfParser {
                 val page = runCatching { item.findDestinationPage(doc) }.getOrNull()
                 val index = page?.let { doc.pages.indexOf(it) } ?: -1
                 val title = item.title?.trim().orEmpty()
-                if (index >= 0 && title.isNotEmpty()) out += PdfMark(title, index)
+                if (index >= 0 && title.isNotEmpty()) out += PdfMark(title, index, depth)
                 if (depth < MAX_MARK_DEPTH) walk(item, depth + 1)
             }
         }
