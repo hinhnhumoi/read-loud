@@ -229,13 +229,23 @@
             android:layout_height="match_parent"
             android:orientation="vertical">
 
-            <EditText
-                android:id="@+id/jump"
+            <LinearLayout
+                android:id="@+id/jumpRow"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
+                android:layout_height="wrap_content"
                 android:layout_marginHorizontal="@dimen/screen_margin"
                 android:layout_marginTop="10dp"
                 android:layout_marginBottom="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+            <EditText
+                android:id="@+id/jump"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
                 android:background="@drawable/bg_search"
                 android:drawableStart="@drawable/ic_search"
                 android:drawablePadding="10dp"
@@ -247,9 +257,36 @@
                 android:maxLines="1"
                 android:paddingHorizontal="12dp"
                 android:textAppearance="@style/TextAppearance.RL.Body"
-                android:textColorHint="@color/rl_faint"
-                android:visibility="gone"
-                tools:visibility="visible" />
+                android:textColorHint="@color/rl_faint" />
+
+                <FrameLayout
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="8dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnRefreshToc"
+                        style="@style/Widget.RL.IconButton"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:contentDescription="@string/toc_reload"
+                        app:icon="@drawable/ic_refresh"
+                        app:iconSize="20dp"
+                        app:iconTint="@color/rl_muted" />
+
+                    <com.google.android.material.progressindicator.CircularProgressIndicator
+                        android:id="@+id/tocRefreshing"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:indeterminate="true"
+                        android:visibility="gone"
+                        app:indicatorColor="@color/rl_accent"
+                        app:indicatorSize="20dp"
+                        app:trackColor="@android:color/transparent"
+                        app:trackThickness="2dp" />
+                </FrameLayout>
+            </LinearLayout>
 
             <FrameLayout
                 android:layout_width="match_parent"

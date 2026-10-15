@@ -14,6 +14,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.Lifecycle
@@ -55,6 +56,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
@@ -320,6 +322,7 @@ class NovelDetailActivity : AppCompatActivity() {
         binding.tocList.adapter = chapterAdapter
         binding.jump.doAfterTextChanged { chapterAdapter.filter(it?.toString().orEmpty()) }
         binding.btnFindToc.setOnClickListener { load(rediscover = true) }
+        binding.btnRefreshToc.setOnClickListener { load(rediscover = false) }
         binding.btnPasteToc.setOnClickListener { askTocUrl() }
     }
 
@@ -346,22 +349,52 @@ class NovelDetailActivity : AppCompatActivity() {
         lastLoad = rediscover to overrideUrl
         loadJob?.cancel()
         showTocStatus(getString(R.string.toc_finding), busy = true, actions = false)
+        val before = entries.size
         loadJob = lifecycleScope.launch {
             try {
-                val tocUrl = overrideUrl ?: current.tocUrl.takeUnless { rediscover } ?: discover(current)
+                val saved = overrideUrl ?: current.tocUrl.takeUnless { rediscover }
+                var tocUrl = saved ?: discover(current)
                 if (tocUrl == null) {
                     showTocStatus(getString(R.string.toc_not_found), busy = false, actions = true)
                     return@launch
                 }
-                val loaded = TocLoader(fetcher).load(tocUrl) { done, known ->
-                    binding.tocStatus.text = getString(R.string.toc_loading_page, done, known)
+                var failure: Exception? = null
+                var loaded = try {
+                    readToc(tocUrl)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: ChallengeRequiredException) {
+                    throw e
+                } catch (e: Exception) {
+                    failure = e
+                    emptyList()
                 }
+                // The saved list page may have moved or broken: look for it again from the chapter being read.
+                if (loaded.isEmpty() && saved != null && overrideUrl == null) {
+                    val found = runCatching { discover(current) }.getOrNull()
+                        ?.takeIf { TocParser.normalize(it) != TocParser.normalize(saved) }
+                    if (found != null) {
+                        tocUrl = found
+                        loaded = readToc(found)
+                        failure = null
+                    }
+                }
+                failure?.let { throw it }
                 if (loaded.isEmpty()) {
                     showTocStatus(getString(R.string.toc_empty), busy = false, actions = true)
                     return@launch
                 }
                 repo.saveToc(current.id, tocUrl, loaded)
                 show(loaded)
+                if (before > 0) {
+                    val change = loaded.size - before
+                    val message = when {
+                        change > 0 -> getString(R.string.toc_refreshed_more, loaded.size, change)
+                        change < 0 -> getString(R.string.toc_refreshed_fewer, loaded.size, -change)
+                        else -> getString(R.string.toc_refreshed_same, loaded.size)
+                    }
+                    Toast.makeText(this@NovelDetailActivity, message, Toast.LENGTH_SHORT).show()
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: ChallengeRequiredException) {
@@ -369,9 +402,17 @@ class NovelDetailActivity : AppCompatActivity() {
                 verify.launch(VerifyActivity.intent(this@NovelDetailActivity, e.url))
             } catch (e: Exception) {
                 showTocStatus(getString(R.string.toc_failed, e.message ?: e.javaClass.simpleName), busy = false, actions = true)
+            } finally {
+                // A load cancelled for a newer one leaves the spinner to that one.
+                if (isActive) showRefreshing(false)
             }
         }
     }
+
+    private suspend fun readToc(tocUrl: String): List<TocParser.Entry> =
+        TocLoader(fetcher).load(tocUrl) { done, known ->
+            binding.tocStatus.text = getString(R.string.toc_loading_page, done, known)
+        }
 
     private suspend fun discover(current: Novel): String? {
         val url = current.currentUrl
@@ -382,24 +423,34 @@ class NovelDetailActivity : AppCompatActivity() {
     private suspend fun show(list: List<TocParser.Entry>) {
         entries = list
         binding.tocStatusGroup.isVisible = false
-        binding.jump.isVisible = list.isNotEmpty()
+        binding.jumpRow.isVisible = list.isNotEmpty()
+        (binding.btnRefreshToc.parent as View).isVisible = !isBook
         chapterAdapter.submit(list)
         chapterAdapter.filter(binding.jump.text?.toString().orEmpty())
         scrolledToCurrent = false
         render()
     }
 
-    /** Status over an empty list; when the list is already there, a failure is only a toast. */
+    /**
+     * Status over an empty list. When the list is already there it stays in view: loading spins the refresh
+     * button and a failure is only a toast.
+     */
     private fun showTocStatus(message: String, busy: Boolean, actions: Boolean) {
-        if (entries.isNotEmpty() && !busy) {
+        if (entries.isNotEmpty()) {
             binding.tocStatusGroup.isVisible = false
-            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            showRefreshing(busy)
+            if (!busy) Toast.makeText(this, message, Toast.LENGTH_LONG).show()
             return
         }
         binding.tocStatusGroup.isVisible = true
         binding.tocProgress.isVisible = busy
         binding.tocStatus.text = message
         binding.tocActions.isVisible = actions && !isBook
+    }
+
+    private fun showRefreshing(busy: Boolean) {
+        binding.tocRefreshing.isVisible = busy
+        binding.btnRefreshToc.isInvisible = busy
     }
 
     private fun askTocUrl() {
