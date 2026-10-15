@@ -3,6 +3,7 @@ package com.tung.readloud.ui
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.tung.readloud.offline.OfflineSaver
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.media.MediaPlayer
 import android.os.Bundle
 import android.os.Handler
@@ -22,6 +23,9 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.button.MaterialButton
 import com.tung.readloud.R
 import com.tung.readloud.data.ProgressStore
 import com.tung.readloud.data.RuleRepository
@@ -29,6 +33,9 @@ import com.tung.readloud.data.VoiceEngine
 import com.tung.readloud.data.VoiceSettings
 import com.tung.readloud.databinding.FragmentSettingsBinding
 import com.tung.readloud.databinding.ItemVoiceBinding
+import com.tung.readloud.databinding.SheetVoiceBackupBinding
+import com.tung.readloud.databinding.SheetVoicePrimaryBinding
+import com.tung.readloud.tts.ReaderState
 import com.tung.readloud.tts.PlaybackStatus
 import com.tung.readloud.tts.ReaderService
 import com.tung.readloud.tts.speech.AzureSynthesizer
@@ -49,8 +56,9 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Where speech comes from and how it sounds. Voice changes are saved when the tab is left, since
- * applying each one restarts the chunk being read; speed, pitch and buffering apply at once.
+ * Where speech comes from and how it sounds. The main voice and the phone voice that stands in for it
+ * are shown as two cards and changed in their own sheets; a change is applied when its sheet closes,
+ * since applying one restarts the chunk being read. Speed, pitch and buffering apply at once.
  */
 class SettingsFragment : Fragment() {
 
@@ -63,13 +71,19 @@ class SettingsFragment : Fragment() {
     private var settings = VoiceSettings()
     private var loaded = false
     private var dirty = false
-    private var systemExpanded = false
+    private var player: ReaderState = ReaderService.state.value
+    private var metaColor: ColorStateList? = null
+    private var primarySheet: SheetVoicePrimaryBinding? = null
+    private var backupSheet: SheetVoiceBackupBinding? = null
+    private var openSheet: BottomSheetDialog? = null
 
     private var tts: TextToSpeech? = null
     private var ttsReady = false
+    private var ttsFailed = false
+    private var systemVoicesMissing = false
     private var systemVoices: List<Voice> = emptyList()
     private var engines: List<TextToSpeech.EngineInfo> = emptyList()
-    private var player: MediaPlayer? = null
+    private var preview: MediaPlayer? = null
     private var previewJob: Job? = null
     private val voiceCards = mutableMapOf<String, ItemVoiceBinding>()
 
@@ -86,12 +100,10 @@ class SettingsFragment : Fragment() {
         binding.rowRules.setOnClickListener { startActivity(Intent(requireContext(), RulesActivity::class.java)) }
         binding.rowHealth.setOnClickListener { Dialogs.showBattery(requireContext()) }
         binding.rowLog.setOnClickListener { Dialogs.showEventLog(requireContext()) }
-        binding.systemToggleRow.setOnClickListener {
-            systemExpanded = !systemExpanded
-            renderSections()
-        }
-        binding.btnTtsSettings.setOnClickListener { Dialogs.openTtsSettings(requireContext()) }
-        binding.btnPreviewSystem.setOnClickListener { previewSystem() }
+        binding.btnChangePrimary.setOnClickListener { openPrimarySheet() }
+        binding.btnChangeBackup.setOnClickListener { openBackupSheet() }
+        binding.primaryPlay.setOnClickListener { previewOnline(settings.onlineVoice, binding.primaryPlay, binding.primaryLoading) }
+        binding.backupPlay.setOnClickListener { previewSystem() }
         bindStyle()
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -105,6 +117,12 @@ class SettingsFragment : Fragment() {
         }
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    ReaderService.state.collect {
+                        player = it
+                        renderNow()
+                    }
+                }
                 launch {
                     OfflineSaver.summary(requireContext()).collect { (count, bytes) ->
                         _binding?.savedSummary?.text = if (count == 0) {
@@ -142,10 +160,11 @@ class SettingsFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        openSheet?.dismiss()
         stopPreview()
         tts?.shutdown()
         tts = null
-        player?.release()
+        preview?.release()
         _binding = null
         super.onDestroyView()
     }
@@ -169,32 +188,141 @@ class SettingsFragment : Fragment() {
         b.healthSummary.setTextColor(ContextCompat.getColor(requireContext(), if (ok) R.color.rl_offline else R.color.rl_warn))
     }
 
-    // ---- Voice source ---------------------------------------------------------------------
+    // ---- Voice: main and stand-in ---------------------------------------------------------
+
+    /** The online source of the main voice, also while "only the phone voice" has it switched off. */
+    private val primaryEngine get() = if (settings.engine == VoiceEngine.SYSTEM) settings.onlineEngine else settings.engine
+
+    private val systemOnly get() = settings.engine == VoiceEngine.SYSTEM
+
+    private val missingAzureKey get() = !systemOnly && settings.engine == VoiceEngine.AZURE && settings.azureKey.isBlank()
 
     private fun bindSettings() {
-        val engineOrder = listOf(VoiceEngine.EDGE, VoiceEngine.AZURE, VoiceEngine.SYSTEM)
-        binding.engineSegment.setOptions(
-            listOf(getString(R.string.settings_engine_edge), getString(R.string.settings_engine_azure), getString(R.string.settings_engine_system)),
-        )
-        binding.engineSegment.select(engineOrder.indexOf(settings.engine))
-        binding.engineSegment.onSelected = { i ->
-            update(settings.copy(engine = engineOrder[i]))
-            renderSections()
+        metaColor = binding.primaryDesc.textColors
+        binding.systemOnlySwitch.isChecked = systemOnly
+        binding.systemOnlySwitch.setOnCheckedChangeListener { _, on ->
+            update(settings.copy(engine = if (on) VoiceEngine.SYSTEM else settings.onlineEngine))
+            commitVoice()
+            renderVoice()
         }
-
-        binding.onlineVoices.removeAllViews()
-        voiceCards.clear()
-        OnlineVoices.all.forEach { voice -> addVoiceCard(voice) }
-
-        binding.azureKey.setText(settings.azureKey)
-        binding.azureRegion.setText(settings.azureRegion)
-        binding.azureKey.doAfterTextChanged { update(settings.copy(azureKey = it?.toString()?.trim().orEmpty())) }
-        binding.azureRegion.doAfterTextChanged { update(settings.copy(azureRegion = it?.toString()?.trim().orEmpty())) }
-        renderSections()
+        renderVoice()
     }
 
-    private fun addVoiceCard(voice: OnlineVoice) {
-        val card = ItemVoiceBinding.inflate(layoutInflater, binding.onlineVoices, false)
+    private fun renderVoice() {
+        val b = _binding ?: return
+        val voice = OnlineVoices.all.firstOrNull { it.id == settings.onlineVoice }
+        b.primaryLabel.setText(if (systemOnly) R.string.voice_primary_off_label else R.string.voice_primary_label)
+        b.primaryName.text = voice?.name ?: settings.onlineVoice
+        if (missingAzureKey) {
+            b.primaryDesc.setText(R.string.voice_primary_azure_no_key)
+            b.primaryDesc.setTextColor(ContextCompat.getColor(requireContext(), R.color.rl_warn))
+        } else {
+            b.primaryDesc.text = getString(R.string.voice_primary_desc, engineName(primaryEngine), voice?.description.orEmpty())
+            metaColor?.let(b.primaryDesc::setTextColor)
+        }
+        b.primaryCard.alpha = if (systemOnly) 0.45f else 1f
+        b.chainRow.isVisible = !systemOnly
+        b.chainNote.setText(if (primaryEngine == VoiceEngine.AZURE) R.string.voice_chain_azure else R.string.voice_chain_edge)
+        b.backupLabel.setText(if (systemOnly) R.string.voice_in_use_label else R.string.voice_backup_label)
+        b.backupName.setText(R.string.voice_system_sheet_title)
+        b.backupDesc.text = getString(R.string.voice_primary_desc, systemEngineName(), systemVoiceName())
+        b.bufferLabel.isVisible = !systemOnly
+        b.bufferSegment.isVisible = !systemOnly
+        b.bufferHint.isVisible = !systemOnly
+        renderNow()
+    }
+
+    /** Which voice is speaking right now: its card is highlighted, and a line above says so. */
+    private fun renderNow() {
+        val b = _binding ?: return
+        val onBackup = systemOnly || missingAzureKey || player.onBackupVoice
+        b.primaryCard.isSelected = !onBackup
+        b.backupCard.isSelected = onBackup
+        val active = player.status == PlaybackStatus.PLAYING || player.status == PlaybackStatus.PAUSED ||
+            player.status == PlaybackStatus.LOADING
+        b.voiceNow.isVisible = active
+        if (!active) return
+        val line = getString(
+            when {
+                systemOnly -> R.string.voice_now_system
+                onBackup -> R.string.voice_now_backup
+                else -> R.string.voice_now_primary
+            },
+        )
+        val own = player.voiceOverride?.takeIf { !onBackup }?.let { OnlineVoices.name(it) }
+        b.voiceNow.text = if (own != null) getString(R.string.voice_now_own, line, own) else line
+        b.voiceNow.setTextColor(ContextCompat.getColor(requireContext(), if (onBackup && !systemOnly) R.color.rl_warn else R.color.rl_offline))
+    }
+
+    private fun engineName(engine: VoiceEngine) =
+        getString(if (engine == VoiceEngine.AZURE) R.string.voice_engine_azure_short else R.string.voice_engine_edge_short)
+
+    private fun systemEngineName(): String {
+        val pkg = settings.systemEngine ?: tts?.takeIf { ttsReady }?.defaultEngine ?: return "…"
+        return engines.firstOrNull { it.name == pkg }?.label ?: pkg
+    }
+
+    private fun systemVoiceName(): String {
+        val name = settings.systemVoice ?: return getString(R.string.voice_backup_default_voice)
+        return systemVoices.firstOrNull { it.name == name }?.let { voiceLabel(it).replace("\n", " · ") } ?: name
+    }
+
+    private fun update(next: VoiceSettings) {
+        if (!loaded || next == settings) return
+        settings = next
+        dirty = true
+    }
+
+    private fun sheetDialog(content: View, onClose: () -> Unit): BottomSheetDialog =
+        BottomSheetDialog(requireContext()).apply {
+            setContentView(content)
+            behavior.state = BottomSheetBehavior.STATE_EXPANDED
+            behavior.skipCollapsed = true
+            setOnDismissListener {
+                if (openSheet === this) openSheet = null
+                onClose()
+                commitVoice()
+                renderVoice()
+            }
+        }
+
+    private fun openPrimarySheet() {
+        if (!loaded || openSheet != null) return
+        val sheet = SheetVoicePrimaryBinding.inflate(layoutInflater)
+        val dialog = sheetDialog(sheet.root) {
+            primarySheet = null
+            voiceCards.clear()
+        }
+        primarySheet = sheet
+        val engineOrder = listOf(VoiceEngine.EDGE, VoiceEngine.AZURE)
+        sheet.engineSegment.setOptions(listOf(getString(R.string.settings_engine_edge), getString(R.string.settings_engine_azure)))
+        sheet.engineSegment.select(engineOrder.indexOf(primaryEngine))
+        sheet.engineSegment.onSelected = { i ->
+            val engine = engineOrder[i]
+            update(if (systemOnly) settings.copy(onlineEngine = engine) else settings.copy(engine = engine, onlineEngine = engine))
+            renderPrimarySheet()
+        }
+        voiceCards.clear()
+        OnlineVoices.all.forEach { voice -> addVoiceCard(sheet, voice) }
+        sheet.azureKey.setText(settings.azureKey)
+        sheet.azureRegion.setText(settings.azureRegion)
+        sheet.azureKey.doAfterTextChanged { update(settings.copy(azureKey = it?.toString()?.trim().orEmpty())) }
+        sheet.azureRegion.doAfterTextChanged { update(settings.copy(azureRegion = it?.toString()?.trim().orEmpty())) }
+        sheet.btnDone.setOnClickListener { dialog.dismiss() }
+        renderPrimarySheet()
+        openSheet = dialog
+        dialog.show()
+    }
+
+    private fun renderPrimarySheet() {
+        val sheet = primarySheet ?: return
+        sheet.engineDesc.setText(if (primaryEngine == VoiceEngine.AZURE) R.string.settings_azure_desc else R.string.settings_edge_desc)
+        sheet.azureSection.isVisible = primaryEngine == VoiceEngine.AZURE
+        renderVoiceCards()
+    }
+
+    private fun addVoiceCard(sheet: SheetVoicePrimaryBinding, voice: OnlineVoice) {
+        val card = ItemVoiceBinding.inflate(layoutInflater, sheet.onlineVoices, false)
         card.voiceName.text = voice.name
         card.voiceDesc.text = voice.description
         card.voicePlay.contentDescription = getString(R.string.settings_voice_play, voice.name)
@@ -202,8 +330,8 @@ class SettingsFragment : Fragment() {
             update(settings.copy(onlineVoice = voice.id))
             renderVoiceCards()
         }
-        card.voicePlay.setOnClickListener { previewOnline(voice.id) }
-        binding.onlineVoices.addView(card.root)
+        card.voicePlay.setOnClickListener { previewOnline(voice.id, card.voicePlay, card.voiceLoading) }
+        sheet.onlineVoices.addView(card.root)
         voiceCards[voice.id] = card
     }
 
@@ -218,34 +346,19 @@ class SettingsFragment : Fragment() {
         }
     }
 
-    private fun update(next: VoiceSettings) {
-        if (!loaded || next == settings) return
-        settings = next
-        dirty = true
-    }
-
-    private fun renderSections() {
-        val b = _binding ?: return
-        val online = settings.engine != VoiceEngine.SYSTEM
-        b.engineDesc.setText(
-            when (settings.engine) {
-                VoiceEngine.EDGE -> R.string.settings_edge_desc
-                VoiceEngine.AZURE -> R.string.settings_azure_desc
-                VoiceEngine.SYSTEM -> R.string.settings_system_desc
-            },
-        )
-        b.onlineVoices.isVisible = online
-        b.azureSection.isVisible = settings.engine == VoiceEngine.AZURE
-        // The phone voice is the whole choice for "Giọng máy"; for online voices it is a fold-out stand-in.
-        b.systemToggleRow.isVisible = online
-        b.systemSection.isVisible = !online || systemExpanded
-        b.systemChevron.rotation = if (systemExpanded) 180f else 0f
-        b.systemTitle.setText(R.string.voice_system_title_fallback)
-        b.systemSummary.text = settings.systemVoice ?: getString(R.string.voice_system_default)
-        b.bufferLabel.isVisible = online
-        b.bufferSegment.isVisible = online
-        b.bufferHint.isVisible = online
-        renderVoiceCards()
+    private fun openBackupSheet() {
+        if (!loaded || openSheet != null) return
+        val sheet = SheetVoiceBackupBinding.inflate(layoutInflater)
+        val dialog = sheetDialog(sheet.root) { backupSheet = null }
+        backupSheet = sheet
+        sheet.sheetTitle.setText(if (systemOnly) R.string.voice_system_sheet_title else R.string.voice_backup_sheet_title)
+        sheet.sheetHint.setText(if (systemOnly) R.string.voice_system_sheet_hint else R.string.voice_backup_sheet_hint)
+        sheet.btnTtsSettings.setOnClickListener { Dialogs.openTtsSettings(requireContext()) }
+        sheet.btnPreviewSystem.setOnClickListener { previewSystem() }
+        sheet.btnDone.setOnClickListener { dialog.dismiss() }
+        bindBackupSheet()
+        openSheet = dialog
+        dialog.show()
     }
 
     // ---- Speed, pitch, buffering --------------------------------------------------------
@@ -350,12 +463,10 @@ class SettingsFragment : Fragment() {
     // ---- System engines and voices --------------------------------------------------------
 
     private fun loadSystemTts(enginePackage: String?) {
-        val b = _binding ?: return
         tts?.shutdown()
         ttsReady = false
-        b.systemVoiceGroup.removeAllViews()
-        b.systemVoiceStatus.isVisible = true
-        b.systemVoiceStatus.setText(R.string.voice_loading)
+        ttsFailed = false
+        bindBackupSheet()
         var created: TextToSpeech? = null
         val listener = TextToSpeech.OnInitListener { status -> main.post { created?.let { onSystemTtsReady(it, status) } } }
         val ctx = requireContext()
@@ -364,51 +475,69 @@ class SettingsFragment : Fragment() {
     }
 
     private fun onSystemTtsReady(engine: TextToSpeech, status: Int) {
-        val b = _binding ?: return
-        if (engine !== tts) return
+        if (_binding == null || engine !== tts) return
         if (status != TextToSpeech.SUCCESS) {
-            b.systemVoiceStatus.setText(R.string.voice_system_failed)
+            ttsFailed = true
+            bindBackupSheet()
+            renderVoice()
             return
         }
         ttsReady = true
         engines = runCatching { engine.engines }.getOrDefault(emptyList())
-        bindEngineDropdown(engine)
-
         val language = engine.setLanguage(SystemSpeaker.VIETNAMESE)
         systemVoices = runCatching { engine.voices }.getOrNull().orEmpty()
             .filter { it.locale.language == "vi" }
-            .sortedWith(compareBy<Voice> { it.features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) }.thenBy { it.name })
-        val missing = language == TextToSpeech.LANG_MISSING_DATA || language == TextToSpeech.LANG_NOT_SUPPORTED
-        b.systemVoiceStatus.isVisible = missing || systemVoices.isEmpty()
-        b.systemVoiceStatus.setText(if (missing) R.string.voice_system_missing else R.string.voice_system_none)
+            // A stand-in for when the network is gone is only useful offline, so those voices come first.
+            .sortedWith(
+                compareBy<Voice> { it.features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) }
+                    .thenBy { it.isNetworkConnectionRequired }
+                    .thenBy { it.name },
+            )
+        systemVoicesMissing = language == TextToSpeech.LANG_MISSING_DATA || language == TextToSpeech.LANG_NOT_SUPPORTED
+        bindBackupSheet()
+        renderVoice()
+    }
 
-        b.systemVoiceGroup.setOnCheckedChangeListener(null)
-        b.systemVoiceGroup.removeAllViews()
+    /** Fills the phone voice sheet from the loaded engine, or says it is still loading. */
+    private fun bindBackupSheet() {
+        val sheet = backupSheet ?: return
+        val engine = tts
+        sheet.systemVoiceGroup.setOnCheckedChangeListener(null)
+        sheet.systemVoiceGroup.removeAllViews()
+        if (engine == null || !ttsReady) {
+            sheet.systemVoiceStatus.isVisible = true
+            sheet.systemVoiceStatus.setText(if (ttsFailed) R.string.voice_system_failed else R.string.voice_loading)
+            return
+        }
+        bindEngineDropdown(sheet, engine)
+        sheet.systemVoiceStatus.isVisible = systemVoicesMissing || systemVoices.isEmpty()
+        sheet.systemVoiceStatus.setText(if (systemVoicesMissing) R.string.voice_system_missing else R.string.voice_system_none)
+
         val defaultButton = voiceRadio(getString(R.string.voice_system_default), null)
-        b.systemVoiceGroup.addView(defaultButton)
-        systemVoices.forEach { b.systemVoiceGroup.addView(voiceRadio(voiceLabel(it), it.name)) }
-        val selected = (0 until b.systemVoiceGroup.childCount)
-            .map { b.systemVoiceGroup.getChildAt(it) as RadioButton }
+        sheet.systemVoiceGroup.addView(defaultButton)
+        systemVoices.forEach { sheet.systemVoiceGroup.addView(voiceRadio(voiceLabel(it), it.name)) }
+        val selected = (0 until sheet.systemVoiceGroup.childCount)
+            .map { sheet.systemVoiceGroup.getChildAt(it) as RadioButton }
             .firstOrNull { it.tag == settings.systemVoice } ?: defaultButton
         selected.isChecked = true
-        b.systemVoiceGroup.setOnCheckedChangeListener { group, checkedId ->
+        sheet.systemVoiceGroup.setOnCheckedChangeListener { group, checkedId ->
             val name = group.findViewById<RadioButton>(checkedId)?.tag as? String
             update(settings.copy(systemVoice = name))
-            renderSections()
+            renderVoice()
         }
     }
 
-    private fun bindEngineDropdown(engine: TextToSpeech) {
-        val b = _binding ?: return
+    private fun bindEngineDropdown(sheet: SheetVoiceBackupBinding, engine: TextToSpeech) {
         val labels = listOf(getString(R.string.voice_engine_default, engine.defaultEngine ?: "")) + engines.map { it.label }
-        b.engineDropdown.setAdapter(ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, labels))
+        sheet.engineDropdown.setAdapter(ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, labels))
         val selectedIndex = engines.indexOfFirst { it.name == settings.systemEngine }.let { if (it < 0) 0 else it + 1 }
-        b.engineDropdown.setText(labels[selectedIndex], false)
-        b.engineDropdown.setOnItemClickListener { _, _, position, _ ->
+        sheet.engineDropdown.setText(labels[selectedIndex], false)
+        sheet.engineDropdown.setOnItemClickListener { _, _, position, _ ->
             val pkg = if (position == 0) null else engines[position - 1].name
             if (pkg == settings.systemEngine) return@setOnItemClickListener
             update(settings.copy(systemEngine = pkg, systemVoice = null))
             loadSystemTts(pkg)
+            renderVoice()
         }
     }
 
@@ -442,9 +571,9 @@ class SettingsFragment : Fragment() {
         engine.speak(getString(R.string.voice_sample), TextToSpeech.QUEUE_FLUSH, null, "preview")
     }
 
-    private fun previewOnline(voiceId: String) {
+    private fun previewOnline(voiceId: String, button: MaterialButton, loading: View) {
         stopPreview()
-        val synthesizer = when (settings.engine) {
+        val synthesizer = when (primaryEngine) {
             VoiceEngine.AZURE -> {
                 if (settings.azureKey.isBlank()) {
                     toast(getString(R.string.voice_azure_need_key))
@@ -454,15 +583,14 @@ class SettingsFragment : Fragment() {
             }
             else -> EdgeSynthesizer(Http.client)
         }
-        val card = voiceCards[voiceId] ?: return
-        card.voicePlay.isEnabled = false
-        card.voiceLoading.isVisible = true
+        button.isEnabled = false
+        loading.isVisible = true
         previewJob = viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val bytes = synthesizer.synthesize(getString(R.string.voice_sample), voiceId)
                 val file = File(requireContext().cacheDir, "preview.mp3")
                 withContext(Dispatchers.IO) { file.writeBytes(bytes) }
-                player = MediaPlayer().apply {
+                preview = MediaPlayer().apply {
                     setDataSource(file.path)
                     setOnCompletionListener { stopPreview() }
                     prepare()
@@ -473,16 +601,16 @@ class SettingsFragment : Fragment() {
             } catch (e: Exception) {
                 toast(getString(R.string.voice_preview_failed, e.message ?: e.javaClass.simpleName))
             } finally {
-                card.voicePlay.isEnabled = true
-                card.voiceLoading.isVisible = false
+                button.isEnabled = true
+                loading.isVisible = false
             }
         }
     }
 
     private fun stopPreview() {
         previewJob?.cancel()
-        player?.release()
-        player = null
+        preview?.release()
+        preview = null
         tts?.takeIf { ttsReady }?.stop()
     }
 

@@ -110,6 +110,7 @@ class ProgressStore(context: Context) {
             it[KEY_ONLINE_VOICE] = settings.onlineVoice
             it[KEY_AZURE_KEY] = settings.azureKey
             it[KEY_AZURE_REGION] = settings.azureRegion
+            it[KEY_ONLINE_ENGINE] = settings.onlineEngine.name
         }
     }
 
@@ -122,6 +123,8 @@ class ProgressStore(context: Context) {
             onlineVoice = p[KEY_ONLINE_VOICE] ?: OnlineVoices.DEFAULT,
             azureKey = p[KEY_AZURE_KEY] ?: "",
             azureRegion = p[KEY_AZURE_REGION] ?: defaults.azureRegion,
+            onlineEngine = p[KEY_ONLINE_ENGINE]?.let { name -> VoiceEngine.entries.firstOrNull { it.name == name && it != VoiceEngine.SYSTEM } }
+                ?: defaults.onlineEngine,
         )
     }
 
@@ -161,6 +164,7 @@ class ProgressStore(context: Context) {
         private val KEY_RATE = floatPreferencesKey("speech_rate")
         private val KEY_PITCH = floatPreferencesKey("pitch")
         private val KEY_ENGINE = stringPreferencesKey("voice_engine")
+        private val KEY_ONLINE_ENGINE = stringPreferencesKey("online_engine")
         private val KEY_SYS_ENGINE = stringPreferencesKey("system_engine")
         private val KEY_SYS_VOICE = stringPreferencesKey("system_voice")
         private val KEY_ONLINE_VOICE = stringPreferencesKey("online_voice")

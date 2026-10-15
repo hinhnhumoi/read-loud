@@ -12,8 +12,8 @@ android {
         applicationId = "com.tung.readloud"
         minSdk = 26
         targetSdk = 35
-        versionCode = 24
-        versionName = "0.24"
+        versionCode = 26
+        versionName = "0.26"
     }
 
     buildTypes {

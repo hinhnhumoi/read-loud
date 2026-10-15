@@ -28,6 +28,8 @@ data class ReaderState(
     val charsPerSecond: Float = DEFAULT_CHARS_PER_SECOND,
     /** Set when the online voice failed and the phone's voice took over. */
     val engineNote: String? = null,
+    /** The online voice failed and the phone's voice is standing in until it recovers. */
+    val onBackupVoice: Boolean = false,
     /** Chapters after the current one whose text and audio are already prepared. */
     val bufferedChapters: Int = 0,
     /** A page stuck behind a bot check that the user has to pass by hand, and where to resume after. */

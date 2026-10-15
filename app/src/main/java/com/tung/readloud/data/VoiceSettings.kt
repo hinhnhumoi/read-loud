@@ -13,4 +13,6 @@ data class VoiceSettings(
     val onlineVoice: String = OnlineVoices.DEFAULT,
     val azureKey: String = "",
     val azureRegion: String = "southeastasia",
+    /** The online source to go back to when "only the phone voice" is turned off again. */
+    val onlineEngine: VoiceEngine = VoiceEngine.EDGE,
 )

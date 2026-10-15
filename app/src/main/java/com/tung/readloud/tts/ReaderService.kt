@@ -412,7 +412,7 @@ class ReaderService : Service() {
         val system = systemSpeaker(settings)
         speaker = system
         speakerSettings = settings
-        setState { copy(engineNote = getString(R.string.voice_fallback_note, reason ?: "")) }
+        setState { copy(engineNote = getString(R.string.voice_fallback_note, reason ?: ""), onBackupVoice = true) }
         scope.launch { loadMeasuredSpeed() }
         scope.launch {
             if (system.prepare() != Speaker.PrepareResult.OK) {
@@ -464,7 +464,7 @@ class ReaderService : Service() {
         usingFallback = false
         lastRecoveredAt = SystemClock.elapsedRealtime()
         EventLog.log("Voice: back to online voice at chunk $index")
-        setState { copy(engineNote = null) }
+        setState { copy(engineNote = null, onBackupVoice = false) }
         scope.launch { loadMeasuredSpeed() }
         startBuffer()
         return true
@@ -477,6 +477,7 @@ class ReaderService : Service() {
         waitingForNetwork = false
         recoveryInterval = RECOVERY_INTERVAL_MS
         lastRecoveredAt = 0L
+        setState { copy(onBackupVoice = false) }
     }
 
     private fun reloadVoice() {
